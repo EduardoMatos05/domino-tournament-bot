@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Domino Tournament Bot</title>
+		<link rel="stylesheet" href="/style.css" />
+	</head>
+	<body>
+		<main>
+			<h1>DOMINO TOURNAMENT BOT</h1>
+
+			<form id="form" autocomplete="off">
+				<label class="field">
+					<span>Tournament URL</span>
+					<input id="url" type="url" placeholder="https://plataforma.dominio/mi-torneo/..." required />
+				</label>
+
+				<div class="field">
+					<span>Players</span>
+					<div class="segmented" role="radiogroup" aria-label="Número de jugadores">
+						<label><input type="radio" name="count" value="8" checked /> 8 jugadores</label>
+						<label><input type="radio" name="count" value="4" /> 4 jugadores</label>
+					</div>
+					<small class="hint">Un certamen online necesita 8. Usa 4 solo para competencias de 4 jugadores o pruebas.</small>
+				</div>
+
+				<div class="players" id="players"></div>
+
+				<div class="field">
+					<span>Game Speed: <strong id="speedValue">2.0s</strong></span>
+					<div class="slider">
+						<small>0.5s</small>
+						<input id="speed" type="range" min="0.5" max="4" step="0.1" value="2" />
+						<small>4.0s</small>
+					</div>
+					<small class="hint">Espera aproximada antes de cada jugada (±20 % distinta en cada bot). Se puede cambiar durante la ejecución.</small>
+				</div>
+
+				<label class="check">
+					<input id="remember" type="checkbox" checked />
+					Recordar cuentas en este equipo (se guardan en config/settings.local.json, que Git ignora)
+				</label>
+
+				<div class="actions">
+					<button id="start" type="submit" class="primary">START TOURNAMENT</button>
+					<button id="stop" type="button" class="danger" disabled>STOP</button>
+				</div>
+				<p id="error" role="alert"></p>
+			</form>
+
+			<section>
+				<h2>STATUS</h2>
+				<table id="status"></table>
+				<p id="logFile" class="hint"></p>
+			</section>
+
+			<section>
+				<h2>LOG</h2>
+				<pre id="log" aria-live="polite"></pre>
+			</section>
+		</main>
+		<script src="/app.js" type="module"></script>
+	</body>
+</html>

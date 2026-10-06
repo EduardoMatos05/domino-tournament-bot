@@ -1,0 +1,227 @@
+:root {
+	--bg: #f6f6f4;
+	--card: #ffffff;
+	--text: #1c1c1a;
+	--muted: #6b6b66;
+	--line: #d9d9d3;
+	--accent: #1f6f4a;
+	--danger: #b3261e;
+	--log-bg: #141414;
+	--log-text: #d8d8d2;
+	--warn: #e0b341;
+	--err: #ff7a70;
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		--bg: #141413;
+		--card: #1e1e1c;
+		--text: #ececE6;
+		--muted: #9a9a92;
+		--line: #3a3a36;
+		--accent: #3fb27f;
+		--danger: #ff7a70;
+		--log-bg: #0c0c0c;
+	}
+}
+* {
+	box-sizing: border-box;
+}
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+main {
+	max-width: 860px;
+	margin: 0 auto;
+	padding: 24px 16px 48px;
+}
+h1 {
+	font-size: 20px;
+	letter-spacing: 0.08em;
+	margin: 0 0 20px;
+}
+h2 {
+	font-size: 13px;
+	letter-spacing: 0.1em;
+	color: var(--muted);
+	margin: 28px 0 8px;
+}
+form,
+section table {
+	background: var(--card);
+	border: 1px solid var(--line);
+	border-radius: 10px;
+}
+form {
+	padding: 18px;
+	display: grid;
+	gap: 16px;
+}
+.field {
+	display: grid;
+	gap: 6px;
+}
+.field > span,
+legend {
+	font-size: 13px;
+	font-weight: 600;
+}
+input[type="text"],
+input[type="password"],
+input[type="url"] {
+	width: 100%;
+	padding: 9px 10px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--bg);
+	color: var(--text);
+	font: inherit;
+}
+input:focus-visible,
+button:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+.players {
+	display: grid;
+	grid-template-columns: repeat(2, 1fr);
+	gap: 12px;
+}
+fieldset {
+	margin: 0;
+	padding: 10px 12px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+	display: grid;
+	gap: 8px;
+}
+fieldset label {
+	display: grid;
+	gap: 3px;
+	font-size: 12px;
+	color: var(--muted);
+}
+.segmented {
+	display: flex;
+	gap: 18px;
+}
+.segmented label {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+	font-size: 14px;
+}
+fieldset[hidden] {
+	display: none;
+}
+.slider {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.slider input {
+	flex: 1;
+	accent-color: var(--accent);
+}
+.hint,
+small {
+	color: var(--muted);
+	font-size: 12px;
+}
+.check {
+	display: flex;
+	gap: 8px;
+	align-items: flex-start;
+	font-size: 13px;
+	color: var(--muted);
+}
+.actions {
+	display: flex;
+	gap: 10px;
+}
+button {
+	padding: 11px 18px;
+	border-radius: 8px;
+	border: 1px solid var(--line);
+	background: var(--card);
+	color: var(--text);
+	font: inherit;
+	font-weight: 600;
+	cursor: pointer;
+}
+button.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+	flex: 1;
+}
+button.danger {
+	color: var(--danger);
+	border-color: var(--danger);
+}
+button:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+#error {
+	margin: 0;
+	color: var(--danger);
+	font-size: 13px;
+	min-height: 1em;
+}
+table {
+	width: 100%;
+	border-collapse: collapse;
+	overflow: hidden;
+}
+td {
+	padding: 9px 14px;
+	border-bottom: 1px solid var(--line);
+}
+tr:last-child td {
+	border-bottom: 0;
+}
+td.status {
+	text-align: right;
+}
+.dot {
+	display: inline-block;
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	margin-right: 8px;
+	background: var(--muted);
+}
+.dot.ok {
+	background: var(--accent);
+}
+.dot.bad {
+	background: var(--danger);
+}
+.dot.play {
+	background: var(--warn);
+}
+#log {
+	margin: 0;
+	height: 320px;
+	overflow: auto;
+	padding: 12px;
+	border-radius: 10px;
+	background: var(--log-bg);
+	color: var(--log-text);
+	font: 12px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+	white-space: pre-wrap;
+}
+#log .warn {
+	color: var(--warn);
+}
+#log .error {
+	color: var(--err);
+}
+@media (max-width: 640px) {
+	.players {
+		grid-template-columns: 1fr;
+	}
+}

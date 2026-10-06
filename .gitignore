@@ -1,0 +1,18 @@
+# dependencias
+node_modules/
+
+# credenciales y configuración local (contraseñas, cuentas, sesiones)
+config/*.local.json
+.env
+.env.*
+!.env.example
+*.cookies.json
+storageState*.json
+
+# logs generados
+logs/*
+!logs/.gitkeep
+
+# sistema
+.DS_Store
+Thumbs.db

@@ -1,0 +1,18 @@
+{
+	"name": "domino-tournament-bot",
+	"version": "0.1.0",
+	"description": "Bot externo que juega un torneo de dominó con 4 cuentas reales usando Playwright.",
+	"private": true,
+	"type": "module",
+	"engines": {
+		"node": ">=20.12"
+	},
+	"scripts": {
+		"start": "node src/main.js",
+		"test": "node --test test/*.test.js",
+		"postinstall": "playwright install chromium"
+	},
+	"dependencies": {
+		"playwright": "^1.49.0"
+	}
+}
