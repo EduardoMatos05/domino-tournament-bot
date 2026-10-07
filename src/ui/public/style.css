@@ -103,15 +103,19 @@ fieldset label {
 	font-size: 12px;
 	color: var(--muted);
 }
-.segmented {
-	display: flex;
-	gap: 18px;
+select {
+	width: max-content;
+	min-width: 160px;
+	padding: 9px 10px;
+	border: 1px solid var(--line);
+	border-radius: 6px;
+	background: var(--bg);
+	color: var(--text);
+	font: inherit;
 }
-.segmented label {
-	display: flex;
-	gap: 6px;
-	align-items: center;
-	font-size: 14px;
+select:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
 }
 fieldset[hidden] {
 	display: none;

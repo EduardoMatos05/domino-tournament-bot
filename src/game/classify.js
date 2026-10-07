@@ -3,6 +3,7 @@ import { TEXT } from "./selectors.js";
 export const KIND = {
 	LOGGED_OUT: "LOGGED_OUT",
 	// portal de comunicación
+	LOADING: "LOADING", // la página aún no pintó nada: no cambia ni se registra nada
 	LOBBY_CLOSED: "LOBBY_CLOSED",
 	WAITING_MATCH: "WAITING_MATCH",
 	TOURNAMENT_FINISHED: "TOURNAMENT_FINISHED",
@@ -36,6 +37,7 @@ export function classify(s) {
 		if (s.text.includes(TEXT.tournamentFinished)) return { kind: KIND.TOURNAMENT_FINISHED };
 		if (s.text.includes(TEXT.tournamentCancelled)) return { kind: KIND.TOURNAMENT_CANCELLED };
 		if (s.text.includes(TEXT.lobbyClosed)) return { kind: KIND.LOBBY_CLOSED };
+		if (s.text.trim().length < 40) return { kind: KIND.LOADING };
 		return { kind: KIND.WAITING_MATCH };
 	}
 
@@ -67,3 +69,24 @@ export const isRoom = (kind) =>
 		KIND.OPPONENT_TURN,
 		KIND.ROOM_LOADING,
 	].includes(kind);
+
+// Títulos que muestra el portal según la fase del torneo (WaitingView.tsx).
+const PORTAL_BANNERS = [
+	"Inicio del torneo",
+	"Siguiente juego",
+	"Partidas en curso",
+	"Sincronizando",
+	"Torneo o evento en pausa",
+	"Pausa solicitada",
+	"Certamen finalizado",
+	"Torneo cancelado",
+];
+
+/** Título de la fase que muestra el portal en este momento, o null. */
+export const portalBanner = (text) => PORTAL_BANNERS.find((title) => String(text ?? "").includes(title)) ?? null;
+
+/** "TOUR_151_RUN_..._MESA_1" -> 151 (número del torneo al que pertenece la mesa), o null. */
+export const roomTournamentId = (room) => {
+	const m = /^TOUR_(\d+)_/.exec(String(room ?? ""));
+	return m ? Number(m[1]) : null;
+};

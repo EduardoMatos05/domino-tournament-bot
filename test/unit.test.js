@@ -3,7 +3,7 @@ import test from "node:test";
 import { SPEED_JITTER } from "../src/config/defaults.js";
 import { validateRunConfig } from "../src/config/settings.js";
 import { parseTournamentUrl } from "../src/config/tournamentUrl.js";
-import { KIND, classify } from "../src/game/classify.js";
+import { KIND, classify, portalBanner, roomTournamentId } from "../src/game/classify.js";
 import { tileName } from "../src/game/selectors.js";
 import { moveDelayMs, shuffle } from "../src/game/timing.js";
 import { describeLoginFailure } from "../src/players/auth.js";
@@ -24,17 +24,19 @@ test("parseTournamentUrl corrige torneos.* a plataforma.* y rechaza URLs sin tor
 
 const players = (...names) => names.map((username) => ({ username, password: "x" }));
 
-test("validateRunConfig acepta 4 u 8 usuarios distintos de hasta 8 caracteres alfanuméricos", () => {
+test("validateRunConfig acepta una cantidad par de jugadores de 2 a 16, con usuarios distintos de hasta 8 caracteres", () => {
 	const base = { tournamentUrl: "https://plataforma.x.com/t/login", speed: 2 };
-	const ok = validateRunConfig({ ...base, players: players("a1", "b2", "c3", "d4") });
-	assert.equal(ok.accounts.length, 4);
-	const eight = validateRunConfig({ ...base, players: players("a1", "b2", "c3", "d4", "e5", "f6", "g7", "h8") });
-	assert.equal(eight.accounts.length, 8);
-	assert.throws(() => validateRunConfig({ ...base, players: players("a1", "b2", "c3") }), /4 u 8/);
-	assert.throws(() => validateRunConfig({ ...base, players: players("a1", "b2", "c3", "d4", "e5", "f6") }), /4 u 8/);
+	const named = (n) => players(...Array.from({ length: n }, (_, i) => `u${i + 1}`));
+
+	for (const n of [2, 4, 6, 8, 10, 12, 14, 16]) {
+		assert.equal(validateRunConfig({ ...base, players: named(n) }).accounts.length, n);
+	}
+	for (const n of [0, 1, 3, 5, 7, 15, 17, 18]) {
+		assert.throws(() => validateRunConfig({ ...base, players: named(n) }), /par, de 2 a 16/, `${n} jugadores`);
+	}
 	assert.throws(() => validateRunConfig({ ...base, players: players("a1", "b2", "c3", "demasiadolargo") }), /1 a 8/);
-	assert.throws(() => validateRunConfig({ ...base, players: players("a1", "A1", "c3", "d4") }), /repetido/);
-	assert.throws(() => validateRunConfig({ ...base, speed: 9, players: players("a", "b", "c", "d") }), /velocidad/);
+	assert.throws(() => validateRunConfig({ ...base, players: players("a1", "A1") }), /repetido/);
+	assert.throws(() => validateRunConfig({ ...base, speed: 9, players: players("a", "b") }), /velocidad/);
 });
 
 test("moveDelayMs varía alrededor de la velocidad y nunca se sale del margen", () => {
@@ -84,7 +86,10 @@ const room = (over) => snap({ path: "/torneo/room/TOUR_1_MESA_1", hasGameTable: 
 
 test("classify: login, portal y fin de torneo", () => {
 	assert.equal(classify(snap({ path: "/torneo/login" })).kind, KIND.LOGGED_OUT);
-	assert.equal(classify(snap({ text: "Siguiente juego 02:00" })).kind, KIND.WAITING_MATCH);
+	const portal = (extra) => snap({ text: `Portal de comunicación (torneo1 - 10:00 CDMX) ${extra}` });
+	assert.equal(classify(portal("Siguiente juego 02:00")).kind, KIND.WAITING_MATCH);
+	assert.equal(classify(snap({ text: "" })).kind, KIND.LOADING, "página sin pintar");
+	assert.equal(classify(snap({ text: "Cargando..." })).kind, KIND.LOADING);
 	assert.equal(classify(snap({ text: "El portal de comunicación estará disponible hasta mañana" })).kind, KIND.LOBBY_CLOSED);
 	assert.equal(classify(snap({ text: "Certamen finalizado" })).kind, KIND.TOURNAMENT_FINISHED);
 	assert.equal(classify(snap({ text: "Torneo cancelado" })).kind, KIND.TOURNAMENT_CANCELLED);
@@ -102,4 +107,20 @@ test("classify: modales y turnos dentro de la mesa", () => {
 	assert.equal(classify(room({ myFace: "idle", hand })).kind, KIND.OPPONENT_TURN);
 	assert.equal(classify(room({ myFace: "skipped", hand })).kind, KIND.OPPONENT_TURN);
 	assert.equal(classify(room({ hasGameTable: false })).kind, KIND.ROOM_LOADING);
+});
+
+test("portalBanner reconoce la fase que muestra el portal", () => {
+	assert.equal(portalBanner("Portal de comunicación Siguiente juego 02:00"), "Siguiente juego");
+	assert.equal(portalBanner("Partidas en curso Hay 2 mesa(s)"), "Partidas en curso");
+	assert.equal(portalBanner("Torneo o evento en pausa Reanudación: ..."), "Torneo o evento en pausa");
+	assert.equal(portalBanner("Certamen finalizado"), "Certamen finalizado");
+	assert.equal(portalBanner("texto sin fase"), null);
+	assert.equal(portalBanner(undefined), null);
+});
+
+test("roomTournamentId saca el número del torneo del nombre de la mesa", () => {
+	assert.equal(roomTournamentId("TOUR_151_RUN_1791308499319_MESA_1"), 151);
+	assert.equal(roomTournamentId("TOUR_146_RUN_1_MESA_2_DEFAULT_x"), 146);
+	assert.equal(roomTournamentId("sala-cualquiera"), null);
+	assert.equal(roomTournamentId(undefined), null);
 });

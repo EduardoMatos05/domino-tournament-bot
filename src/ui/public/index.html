@@ -18,11 +18,12 @@
 
 				<div class="field">
 					<span>Players</span>
-					<div class="segmented" role="radiogroup" aria-label="Número de jugadores">
-						<label><input type="radio" name="count" value="8" checked /> 8 jugadores</label>
-						<label><input type="radio" name="count" value="4" /> 4 jugadores</label>
-					</div>
-					<small class="hint">Un certamen online necesita 8. Usa 4 solo para competencias de 4 jugadores o pruebas.</small>
+					<select id="count" aria-label="Número de jugadores"></select>
+					<small class="hint">
+						Cuentas que manejará el bot: un número par, de 2 a 16. Una mesa es de 4 jugadores, así que los lugares
+						que el bot no cubra los deben ocupar otras personas. Un certamen online usa 8, 12 o 16.
+						Cada jugador abre su propio Chromium (entre 0.2 y 0.4 GB de RAM cada uno; con 16 conviene tener 8 GB libres).
+					</small>
 				</div>
 
 				<div class="players" id="players"></div>

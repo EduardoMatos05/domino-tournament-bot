@@ -46,7 +46,6 @@ export function takeSnapshot(page) {
 				modalButtons: texts(document.querySelectorAll(sel.modalButton)),
 				sideModal: !!sideModal,
 				sideOptions: sideModal ? texts(sideModal.querySelectorAll(sel.sideModalOptions)) : [],
-				portalPlayers: texts(document.querySelectorAll(sel.portalPlayers)),
 			};
 		},
 		{ sel: SEL, face: FACE },

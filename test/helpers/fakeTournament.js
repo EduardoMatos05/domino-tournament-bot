@@ -5,7 +5,12 @@ import http from "node:http";
  * solo para probar al bot sin depender de un torneo real. No es una copia de las reglas del juego.
  * Usuarios: cualquiera con contraseña "ok"; contraseña distinta -> 404 (como el login real).
  */
-export function startFakeTournament({ slug = "torneo" } = {}) {
+export function startFakeTournament({
+	slug = "torneo",
+	tournamentId = 146,
+	roomTournamentId = tournamentId,
+	ignoreMoves = false, // el "servidor" recibe las jugadas pero nunca las aplica (como el caso de la cuenta en dos torneos)
+} = {}) {
 	const moves = []; // lo que el "servidor" recibió: [{tile, side}]
 	const server = http.createServer(async (req, res) => {
 		const url = new URL(req.url, "http://x");
@@ -28,9 +33,11 @@ export function startFakeTournament({ slug = "torneo" } = {}) {
 			return res.end();
 		}
 		res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-		if (url.pathname === `/${slug}/login`) return res.end(LOGIN);
-		if (url.pathname === `/${slug}/portal-comunicacion`) return res.end(PORTAL);
-		if (url.pathname.startsWith(`/${slug}/room/`)) return res.end(ROOM);
+		const fill = (html) =>
+			html.replaceAll("@TID@", tournamentId).replaceAll("@RTID@", roomTournamentId).replaceAll("@IGNORE@", String(ignoreMoves));
+		if (url.pathname === `/${slug}/login`) return res.end(fill(LOGIN));
+		if (url.pathname === `/${slug}/portal-comunicacion`) return res.end(fill(PORTAL));
+		if (url.pathname.startsWith(`/${slug}/room/`)) return res.end(fill(ROOM));
 		res.end(`<p>OTHER ${url.pathname}</p>`);
 	});
 	return new Promise((resolve) =>
@@ -52,17 +59,18 @@ const [u, p] = document.querySelectorAll('input');
 p.addEventListener('keydown', async (e) => {
   if (e.key !== 'Enter') return;
   const r = await fetch('/api/token/tournament', { method: 'POST', body: JSON.stringify({ user_email: u.value, user_password: p.value }) });
+  if (r.ok) sessionStorage.setItem('Context', JSON.stringify({ id_tournament: @TID@ }));
   if (r.ok) location.pathname = location.pathname.replace('/login', '/competitor');
 });
 </script></body>`;
 
 // Portal: 1ª visita -> espera y "el servidor" asigna mesa; tras jugar -> "Certamen finalizado".
-const PORTAL = `<!doctype html><body><div class="portal"><ul><li>jugador (EN LINEA)</li></ul></div>
+const PORTAL = `<!doctype html><body><div>Portal de comunicación (jugador - 10:00 CDMX)</div>
 <div id="banner"></div>
 <script>
 const played = sessionStorage.getItem('played');
 document.getElementById('banner').textContent = played ? 'Certamen finalizado' : 'Siguiente juego';
-if (!played) setTimeout(() => { location.pathname = location.pathname.replace('portal-comunicacion', 'room/TOUR_1_MESA_1'); }, 1500);
+if (!played) setTimeout(() => { location.pathname = location.pathname.replace('portal-comunicacion', 'room/TOUR_@RTID@_RUN_1_MESA_1'); }, 1500);
 </script></body>`;
 
 const ROOM = `<!doctype html><body>
@@ -105,6 +113,7 @@ function click(tile) {
 }
 function play(tile, side) {
   fetch('/move', { method: 'POST', body: JSON.stringify({ tile, side }) });
+  if (@IGNORE@) return;
   setTimeout(() => { // el "servidor" confirma
     hand = hand.filter((t) => t !== tile); myTurn = false; moveCount++;
     const rest = hand.flatMap((t) => t.split('-').map(Number));

@@ -1,7 +1,9 @@
-// Un certamen online necesita 8 jugadores (el engine solo tiene mesas para 8, 12 y 16); 4 sirve para pruebas.
-export const PLAYER_COUNTS = [4, 8];
-export const MAX_PLAYERS = Math.max(...PLAYER_COUNTS);
+// Cantidad de cuentas que maneja el bot: un número par de 2 a 16 (por defecto 8).
+// Una mesa es de 4 jugadores y un certamen online usa 8, 12 o 16; lo que el bot no cubra lo ocupan otras personas.
+export const MIN_PLAYERS = 2;
+export const MAX_PLAYERS = 16;
 export const DEFAULT_PLAYER_COUNT = 8;
+export const isValidPlayerCount = (n) => Number.isInteger(n) && n % 2 === 0 && n >= MIN_PLAYERS && n <= MAX_PLAYERS;
 
 export const SPEED = { min: 0.5, max: 4.0, step: 0.1, default: 2.0 };
 // Variación aleatoria (±) aplicada a la espera antes de cada jugada.
@@ -22,6 +24,11 @@ export const KEEPALIVE_MS = 4 * 60_000;
 // El JWT dura 1 h y solo se renueva al recargar la página.
 export const PORTAL_RELOAD_MS = 40 * 60_000;
 export const LOBBY_CLOSED_RELOAD_MS = 60_000; // el portal no se actualiza solo cuando aún no abre
+
+// Si el servidor no acepta una jugada que la pantalla sí aceptó, se espera cada vez más antes de reintentar.
+export const UNCONFIRMED_BACKOFF_MS = [1_000, 2_000, 3_000, 5_000];
+// Si pasa este tiempo sin ninguna línea de log de un jugador, se escribe una línea de "sigue vivo".
+export const HEARTBEAT_LOG_MS = 120_000;
 
 export const MAX_RELOGINS = 5;
 export const MAX_CONSECUTIVE_ERRORS = 10;

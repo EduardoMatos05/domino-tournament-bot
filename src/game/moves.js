@@ -21,7 +21,7 @@ export function watchDialogs(page) {
  * Se prueban las fichas en orden aleatorio hasta que una sea aceptada, de modo que
  * cada ficha jugable tiene la misma probabilidad y no se duplican las reglas del dominó.
  *
- * @returns {Promise<{played: boolean, sentAt?: number, reason?: "not-turn"|"none-playable"|"unconfirmed"}>}
+ * @returns {Promise<{played: boolean, sentAt?: number, reason?: "not-turn"|"none-playable"|"unconfirmed", tile?: string}>}
  */
 export async function playRandomMove(page, dialogs, log, signal, { rng = Math.random, hand, notBefore } = {}) {
 	hand ??= (await takeSnapshot(page)).hand;
@@ -56,8 +56,7 @@ export async function playRandomMove(page, dialogs, log, signal, { rng = Math.ra
 			log.info("Move completed");
 			return { played: true, sentAt };
 		}
-		log.warn(`Tile ${tile} was clicked but is still in my hand after ${MOVE_CONFIRM_TIMEOUT_MS / 1000}s`);
-		return { played: false, reason: "unconfirmed" };
+		return { played: false, reason: "unconfirmed", tile };
 	}
 
 	log.warn("None of my tiles was accepted by the game");

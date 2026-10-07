@@ -41,6 +41,7 @@ test("un bot completo: login, asistencia, jugadas legales, modales y fin de torn
 		const log = lines.join("\n");
 		for (const expected of [
 			"Login successful",
+			"Tournament id: 146",
 			"Match detected",
 			"Attendance confirmed",
 			"My turn",
@@ -115,6 +116,68 @@ test("8 jugadores a la vez a través del runner: todos terminan el torneo", { ti
 		assert.equal(fake.moves.length, 8 * 3, "3 jugadas por bot llegaron al servidor");
 	} finally {
 		await runner.stop();
+		fake.close();
+	}
+});
+
+test("2 jugadores (el mínimo) a través del runner", { timeout: 90_000 }, async () => {
+	const fake = await startFakeTournament();
+	const runner = new TournamentRunner({ headless: true });
+	try {
+		await runner.start({
+			tournament: parseTournamentUrl(`${fake.origin}/${fake.slug}/login`),
+			speed: 0.5,
+			accounts: [
+				{ username: "uno", password: "ok" },
+				{ username: "dos", password: "ok" },
+			],
+		});
+		const deadline = Date.now() + 80_000;
+		while (runner.running && Date.now() < deadline) await new Promise((r) => setTimeout(r, 500));
+
+		const final = runner.snapshot().players.map((p) => `${p.name}:${p.status}`);
+		assert.equal(runner.running, false, final.join(", "));
+		assert.deepEqual(final, [`Player 1:${STATUS.FINISHED}`, `Player 2:${STATUS.FINISHED}`]);
+	} finally {
+		await runner.stop();
+		fake.close();
+	}
+});
+
+test("avisa cuando el engine manda a la cuenta a una mesa de otro torneo", { timeout: 90_000 }, async () => {
+	const fake = await startFakeTournament({ tournamentId: 146, roomTournamentId: 151 });
+	const { bot, lines } = makeBot(fake, "ok");
+	try {
+		await bot.run();
+		assert.ok(
+			lines.some((l) => l.startsWith("WARN This table belongs to tournament 151, but this run is for tournament 146")),
+			lines.join("\n"),
+		);
+	} finally {
+		await bot.stop();
+		fake.close();
+	}
+});
+
+test("si el servidor ignora las jugadas: un solo aviso por ficha, aviso de racha y reintentos cada vez más espaciados", { timeout: 120_000 }, async () => {
+	const fake = await startFakeTournament({ ignoreMoves: true });
+	const { bot, lines } = makeBot(fake, "ok");
+	try {
+		const running = bot.run();
+		const deadline = Date.now() + 100_000;
+		while (!lines.some((l) => l.includes("moves in a row were not accepted")) && Date.now() < deadline) {
+			await new Promise((r) => setTimeout(r, 500));
+		}
+		await bot.stop();
+		await running;
+
+		const single = lines.filter((l) => l.includes("was clicked but the game did not take it"));
+		const streak = lines.filter((l) => l.includes("3 moves in a row were not accepted"));
+		assert.equal(single.length, 1, "el aviso individual sale una sola vez, no en cada reintento");
+		assert.equal(streak.length, 1, lines.join("\n"));
+		assert.match(streak[0], /tour\) logs/);
+	} finally {
+		await bot.stop();
 		fake.close();
 	}
 });

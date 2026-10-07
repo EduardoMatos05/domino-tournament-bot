@@ -1,7 +1,7 @@
-# Domino Tournament Bot — v0.1.0
+# Domino Tournament Bot — v0.2.0
 
-Bot externo que juega un torneo de dominó con **8 cuentas reales** (o 4) desde una sola computadora.
-Abre un navegador Chromium independiente por jugador, inicia sesión como lo haría una
+Bot externo que juega un torneo de dominó con **de 2 a 16 cuentas reales** (un número par, 8 por defecto)
+desde una sola computadora. Abre un navegador Chromium independiente por jugador, inicia sesión como lo haría una
 persona y juega fichas legales al azar hasta que el torneo termina. No modifica el juego.
 
 El bot **no entiende el torneo**: no sabe de rondas, formatos ni puntuaciones. Solo mira el estado
@@ -10,9 +10,13 @@ real de la pantalla (¿hay partida?, ¿es mi turno?, ¿terminó?) y reacciona.
 ## Requisitos
 
 - **Node.js 20.12 o superior** (<https://nodejs.org>, versión LTS). Funciona igual en Windows y macOS.
-- Un certamen online necesita **8 jugadores** (el engine solo tiene mesas para 8, 12 y 16), así que el bot
-  usa 8 cuentas por defecto. El modo de 4 sirve para competencias de 4 jugadores o pruebas.
 - Las cuentas deben estar **inscritas manualmente** en un torneo **online** (no presencial).
+- Cuántas cuentas usar: una **mesa es de 4 jugadores**. Un certamen online necesita 8, 12 o 16; un concurso, 4 o
+  más. El bot acepta cualquier cantidad **par de 2 a 16**; los lugares que el bot no cubra los deben ocupar
+  otras personas (y confirmar su asistencia a tiempo, o el engine elimina esa mesa).
+- **Una cuenta del bot no debe estar inscrita en dos torneos activos a la vez**: el engine guarda a los jugadores
+  por nombre de usuario y puede mandarla a una mesa del otro torneo (el bot lo avisa en el log).
+- Memoria: cada jugador abre su propio Chromium, entre 0.2 y 0.4 GB de RAM cada uno (con 16 conviene tener 8 GB libres).
 - Cada usuario debe tener **de 1 a 8 letras o números** (el login del juego no admite más).
 
 ## Instalación
@@ -36,13 +40,13 @@ Se abre la interfaz en <http://127.0.0.1:4173>:
 
 1. Pega la **Tournament URL** (la del torneo, p. ej. `https://plataforma.<dominio>/<torneo>/...`).
    Solo importa el primer segmento de la ruta: el bot no necesita ID de torneo, ronda ni mesa.
-2. Elige **8 o 4 jugadores** y escribe usuario y contraseña de cada uno.
+2. Elige cuántos jugadores (par, de **2 a 16**) y escribe usuario y contraseña de cada uno.
 3. Elige la **velocidad** (0.5 s – 4.0 s): lo que tarda cada bot, **desde que empieza su turno hasta que
    tira la ficha**, con ±20 % de variación distinta en cada bot y cada jugada (con 2 s, entre 1.6 y 2.4 s).
    Se puede mover mientras el torneo corre. En la práctica la ficha sale unos 0.1–0.2 s después de lo
    elegido (el bot nota el turno hasta ~0.15 s tarde) y, si una ficha no cabe, el intento de probar la
    siguiente suma ~0.1 s. El log muestra `Move sent X.Xs after my turn started` en cada jugada.
-4. Pulsa **START TOURNAMENT**. Se abre una ventana por jugador (repartidas por la pantalla; con 8 se solapan, no las cierres ni minimices) y los bots juegan solos.
+4. Pulsa **START TOURNAMENT**. Se abre una ventana por jugador (repartidas por la pantalla; con muchos jugadores se solapan, no las cierres ni minimices) y los bots juegan solos.
 
 **STOP** detiene todo y cierra los navegadores. Al terminar el torneo los navegadores quedan abiertos
 mostrando el resultado; el botón pasa a **CLOSE BROWSERS**.
@@ -73,7 +77,9 @@ Cada ejecución crea `logs/AAAA-MM-DD_HH-mm-ss.log` y lo muestra en vivo en la i
 ```text
 [Player 1] Opening tournament
 [Player 1] Login successful
+[Player 1] Tournament id: 12
 [Player 1] Waiting for match
+[Player 1] Portal: Siguiente juego
 [Player 1] Match detected (TOUR_12_RUN_1_MESA_3)
 [Player 1] Attendance confirmed
 [Player 1] My turn
@@ -85,7 +91,13 @@ Cada ejecución crea `logs/AAAA-MM-DD_HH-mm-ss.log` y lo muestra en vivo en la i
 [Player 1] Available positions: Sección 1 (arriba), Sección 3 (abajo)
 [Player 1] Selected position: Sección 3 (abajo)
 [Player 1] Move completed
+[Player 1] Move sent 2.0s after my turn started
 ```
+
+Otras líneas útiles: `Portal: <fase>` (lo que muestra el portal: "Siguiente juego", "Partidas en curso", "Torneo o
+evento en pausa"...), `Match starting`, `Hand ended`, `Match finished`, `Table loading`, y `Still: <estado>` cuando
+un jugador pasa 2 minutos sin novedades (para saber que sigue vivo). Si el portal muestra "Torneo cancelado", el
+motivo que dio el engine queda en el log (`Tournament cancelled: ...`).
 
 Un jugador con problemas (login fallido, ventana cerrada, errores repetidos) queda en estado
 `Error` con el motivo; **los demás siguen jugando**.
@@ -108,10 +120,14 @@ Copia `.env.example` a `.env`: `BOT_UI_PORT` (puerto de la interfaz), `BOT_HEADL
 | Síntoma | Causa probable |
 |---|---|
 | `Login failed: el usuario no existe / contraseña incorrecta` | Credenciales mal escritas |
+| `Login failed: el torneo no existe en este entorno` | La URL no es la del torneo de ese entorno (o el torneo no existe aún) |
 | `Login failed: el torneo no está disponible` | El torneo debe estar aprobado y pagado |
+| `Login failed: el servidor no pudo validar el acceso` | Error interno del engine (HTTP 500); revisar sus logs |
 | `no apareció el formulario de login` | La URL no es la del torneo de ese entorno |
-| Aviso "I do not appear in the portal's online players list" | El socket `/tour` no conectó. El engine actual exige el JWT real en el socket y las versiones antiguas del frontend envían el texto `"Token"`: el frontend desplegado debe estar actualizado |
+| `This table belongs to tournament X, but this run is for tournament Y` | La cuenta está inscrita en otro torneo activo y el engine la mandó a esa mesa. Cancela o termina el otro torneo, o usa cuentas que solo estén en este |
+| `N moves in a row were not accepted` | La pantalla acepta la ficha pero el servidor la ignora (el bot espera cada vez más entre intentos). Revisar los logs del servicio `tour` del engine; una cuenta en dos torneos activos puede causarlo |
 | Un jugador pasa a `Error: the session keeps closing` | Esa cuenta está abierta en otro navegador (el juego permite una sesión por usuario) |
+| Un jugador espera mucho en "Waiting for match" | Su mesa pudo eliminarse porque alguien no confirmó asistencia a tiempo, o la cuenta no está inscrita en el evento que toca |
 | Una jugada llega tarde y el equipo pierde la partida | Velocidad demasiado alta para el reloj de turno del torneo: baja la velocidad |
 
 ## Estructura
@@ -123,7 +139,7 @@ src/
   browser/         lanzamiento de Chromium (uno por jugador)
   players/         PlayerBot (bucle estado→acción) y login
   game/            selectors (todo lo que se sabe del DOM), snapshot, classify (estado), moves, timing
-  runner/          crea los 4 bots y los detiene
+  runner/          crea los bots y los detiene
   logger/          consola + archivo + interfaz
   ui/              servidor local y página (formulario, estado, log)
 test/              pruebas unitarias y de punta a punta contra un juego simulado
@@ -138,10 +154,23 @@ si el frontend cambia, se corrige ahí.
 npm test
 ```
 
-Incluye pruebas completas (login → asistencia → jugadas → modales → fin de torneo, con 1 y con 8 bots a la vez) contra un juego
+Incluye pruebas completas (login → asistencia → jugadas → modales → fin de torneo, con 1, 2 y 8 bots a la vez; también el aviso de mesa de otro torneo y el freno cuando el servidor ignora las jugadas) contra un juego
 simulado que imita el DOM real. **No sustituye una prueba contra un torneo real.**
 
-## Fuera del MVP (pensado en la arquitectura, no implementado)
+## Novedades
 
-12/16/32 jugadores (los tamaños permitidos están en `PLAYER_COUNTS`), perfiles de bots,
-desconexiones simuladas, modo headless completo, historial.
+**0.2.0**
+- Cantidad de jugadores configurable: cualquier número **par de 2 a 16** (antes 4 fijos).
+- La espera de la velocidad se cuenta desde que empieza el turno hasta que sale la ficha (la jugada sale a ~0.1–0.2 s de lo elegido).
+- Detecta cuando el engine manda a una cuenta a una mesa de **otro torneo** y lo avisa en el log.
+- Si el servidor ignora las jugadas: un solo aviso por ficha, aviso de racha y reintentos cada vez más espaciados (antes reintentaba cada ~6 s sin avisar).
+- Errores de navegación de la página ya no salen como ERROR (se reintentan en silencio).
+- Se quitó el aviso "I do not appear in the portal's online players list" (daba falsos positivos).
+- Más detalle en el log: fases del portal, inicio/fin de mano y partida, y línea `Still: ...` cada 2 min sin novedades.
+- Motivo de la cancelación del torneo en el log y nuevos códigos de error del login del engine (401, 404, 500).
+
+**0.1.0**: primera versión (login, asistencia, jugadas aleatorias, fin de torneo, interfaz local, logs).
+
+## Fuera del alcance por ahora
+
+Más de 16 jugadores, perfiles de bots, desconexiones simuladas, modo headless completo, historial.

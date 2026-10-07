@@ -1,16 +1,19 @@
 import {
+	HEARTBEAT_LOG_MS,
 	KEEPALIVE_MS,
 	LOBBY_CLOSED_RELOAD_MS,
 	MAX_CONSECUTIVE_ERRORS,
 	MAX_RELOGINS,
+	MOVE_CONFIRM_TIMEOUT_MS,
 	POLL_MS,
+	PORTAL_RELOAD_MS,
 	PREPARE_MS,
 	ROOM_POLL_MS,
-	PORTAL_RELOAD_MS,
 	TERMINAL_CONFIRMATIONS,
+	UNCONFIRMED_BACKOFF_MS,
 } from "../config/defaults.js";
 import { launchPlayerBrowser } from "../browser/launch.js";
-import { KIND, classify, isRoom } from "../game/classify.js";
+import { KIND, classify, isRoom, portalBanner, roomTournamentId } from "../game/classify.js";
 import { playRandomMove, watchDialogs } from "../game/moves.js";
 import { TEXT } from "../game/selectors.js";
 import { takeSnapshot } from "../game/snapshot.js";
@@ -36,7 +39,19 @@ export const STATUS = {
 };
 
 const TERMINAL = new Set([STATUS.FINISHED, STATUS.CANCELLED, STATUS.ERROR, STATUS.STOPPED]);
-const SOCKET_WARNING_AFTER_MS = 45_000;
+
+// Mensaje al entrar en cada estado de la mesa (los de espera sencilla se registran una sola vez por cambio).
+const ROOM_MESSAGES = {
+	[KIND.ROOM_LOADING]: "Table loading",
+	[KIND.PRE_START]: "Match starting",
+	[KIND.HAND_ENDED]: "Hand ended",
+	[KIND.GAME_ENDED]: "Match finished",
+	[KIND.PAUSED]: "Match paused",
+};
+
+/** La página navegó justo mientras se leía: es normal y se reintenta sin ruido. */
+const isNavigationRace = (error) =>
+	/Execution context was destroyed|most likely because of a navigation|Frame was detached/i.test(error?.message ?? "");
 
 /**
  * Un jugador = un navegador + un bucle "mirar estado real -> actuar".
@@ -61,7 +76,16 @@ export class PlayerBot {
 		this.account = account;
 		this.tournament = tournament;
 		this.speed = speed;
-		this.log = logger;
+		// Cada línea de log marca la hora, para avisar con una línea de "sigue vivo" si pasa mucho sin novedades.
+		const touch = () => {
+			this.lastLogAt = Date.now();
+		};
+		this.log = {
+			info: (m) => (touch(), logger.info(m)),
+			warn: (m) => (touch(), logger.warn(m)),
+			error: (m) => (touch(), logger.error(m)),
+		};
+		this.lastLogAt = Date.now();
 		this.headless = headless;
 		this.onChange = onChange;
 
@@ -77,8 +101,9 @@ export class PlayerBot {
 		this.relogins = 0;
 		this.loadedAt = 0; // última carga completa de página (para renovar el JWT)
 		this.lastKeepAlive = 0;
-		this.socketWarned = false;
-		this.portalSince = 0;
+		this.tournamentId = null; // número del torneo de esta corrida (sale de la sesión del jugador)
+		this.lastBanner = null;
+		this.unconfirmed = 0; // jugadas seguidas que la pantalla aceptó y el servidor no
 		this.loggedOutHits = 0;
 		this.warnedFace = false;
 		this.lastText = "";
@@ -143,7 +168,7 @@ export class PlayerBot {
 		this.setStatus(STATUS.LOGGING_IN);
 		try {
 			await login(this.session.page, this.tournament, this.account, this.log);
-			this.portalSince = Date.now();
+			await this.readTournamentId();
 		} catch (error) {
 			if (error instanceof LoginError && error.fatal) {
 				this.log.error(`Login failed: ${error.message}`);
@@ -164,6 +189,10 @@ export class PlayerBot {
 				consecutiveErrors = 0;
 			} catch (error) {
 				if (this.abort.signal.aborted) return;
+				if (isNavigationRace(error) && !this.session?.page.isClosed()) {
+					await sleep(300, this.abort.signal);
+					continue;
+				}
 				consecutiveErrors += 1;
 				this.log.error(`Error: ${error.message.split("\n")[0]}`);
 				if (this.session?.page.isClosed()) throw new Error("the browser window was closed");
@@ -182,6 +211,10 @@ export class PlayerBot {
 		this.lastText = snap.text;
 		const state = classify(snap);
 		this.noteTransition(state);
+		this.noteBanner(state, snap.text);
+		if (Date.now() - this.lastLogAt >= HEARTBEAT_LOG_MS) {
+			this.log.info(`Still: ${this.status}${this.detail ? ` (${this.detail})` : ""}`);
+		}
 
 		if (state.kind !== KIND.TOURNAMENT_FINISHED && state.kind !== KIND.TOURNAMENT_CANCELLED) {
 			this.terminalHits = 0;
@@ -200,13 +233,15 @@ export class PlayerBot {
 				this.loggedOutHits = 0;
 				return this.relogin();
 
+			case KIND.LOADING:
+				return; // la página todavía está pintando
+
 			case KIND.LOBBY_CLOSED:
 				this.setStatus(STATUS.WAITING_LOBBY);
 				return this.reloadPortalIf(LOBBY_CLOSED_RELOAD_MS);
 
 			case KIND.WAITING_MATCH:
 				this.setStatus(STATUS.WAITING_MATCH);
-				this.warnIfSocketSilent(snap);
 				return this.reloadPortalIf(PORTAL_RELOAD_MS);
 
 			case KIND.TOURNAMENT_FINISHED:
@@ -280,11 +315,30 @@ export class PlayerBot {
 			notBefore: turnStartedAt + delay,
 		});
 		if (result.played) {
+			this.unconfirmed = 0;
 			// Tiempo real desde que el bot notó su turno hasta que la jugada salió hacia el servidor.
 			this.log.info(`Move sent ${((result.sentAt - turnStartedAt) / 1000).toFixed(1)}s after my turn started`);
-		} else {
-			await sleep(1_000, this.abort.signal); // no martillar el click
+			return;
 		}
+
+		if (result.reason === "unconfirmed") {
+			this.unconfirmed += 1;
+			const n = this.unconfirmed;
+			if (n === 1) {
+				this.log.warn(
+					`Tile ${result.tile} was clicked but the game did not take it (still in my hand after ${MOVE_CONFIRM_TIMEOUT_MS / 1000}s)`,
+				);
+			} else if (n === 3 || n % 10 === 0) {
+				this.log.warn(
+					`${n} moves in a row were not accepted: the screen takes the tile but the server ignores it. ` +
+						"Check the engine (tour) logs; an account enrolled in two active tournaments can cause this.",
+				);
+			}
+			await sleep(UNCONFIRMED_BACKOFF_MS[Math.min(n, UNCONFIRMED_BACKOFF_MS.length) - 1], this.abort.signal);
+			return;
+		}
+
+		await sleep(1_000, this.abort.signal); // no martillar el click
 	}
 
 	async clickOnce(page, key, buttonText, doneMessage) {
@@ -351,18 +405,6 @@ export class PlayerBot {
 		await this.session.page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
 	}
 
-	/** Si no aparezco como "en línea" en el portal, probablemente el socket /tour no conectó. */
-	warnIfSocketSilent(snap) {
-		if (this.socketWarned || Date.now() - this.portalSince < SOCKET_WARNING_AFTER_MS) return;
-		const me = this.account.username.toLowerCase();
-		if (snap.portalPlayers.some((p) => p.toLowerCase().includes(me))) return;
-		this.socketWarned = true;
-		this.log.warn(
-			"I do not appear in the portal's online players list: the /tour socket may not be connected " +
-				"(is the deployed frontend sending the real JWT in socket auth? it is required by the current engine)",
-		);
-	}
-
 	cooldown(key, ms) {
 		const now = Date.now();
 		if (now < (this.cooldowns.get(key) ?? 0)) return false;
@@ -372,18 +414,62 @@ export class PlayerBot {
 
 	noteTransition(state) {
 		const was = this.lastKind;
-		if (state.kind === was) return;
+		if (state.kind === was || state.kind === KIND.LOADING) return;
 		this.lastKind = state.kind;
 
-		if (state.kind === KIND.WAITING_MATCH || state.kind === KIND.LOBBY_CLOSED) {
-			this.portalSince = this.portalSince || Date.now();
+		if (state.kind === KIND.LOBBY_CLOSED) {
+			this.log.info("Waiting for the portal to open");
+		} else if (state.kind === KIND.WAITING_MATCH) {
 			this.log.info(was && isRoom(was) ? "Match ended, waiting for next match" : "Waiting for match");
 		} else if (isRoom(state.kind) && !(was && isRoom(was))) {
 			this.log.info(`Match detected (${state.room})`);
-		} else if (state.kind === KIND.OPPONENT_TURN && was !== KIND.ROOM_LOADING) {
-			this.log.info("Waiting for turn");
-		} else if (state.kind === KIND.PAUSED) {
-			this.log.info("Match paused");
+			this.unconfirmed = 0;
+			this.lastBanner = null;
+			this.checkRoomTournament(state.room);
+		} else if (state.kind === KIND.OPPONENT_TURN) {
+			if (was !== KIND.ROOM_LOADING) this.log.info("Waiting for turn");
+		} else if (ROOM_MESSAGES[state.kind]) {
+			this.log.info(ROOM_MESSAGES[state.kind]);
+		}
+	}
+
+	/** Registra el título de fase del portal ("Siguiente juego", "Partidas en curso"...) cuando cambia. */
+	noteBanner(state, text) {
+		if (![KIND.WAITING_MATCH, KIND.LOBBY_CLOSED].includes(state.kind)) return;
+		const banner = portalBanner(text);
+		if (!banner || banner === this.lastBanner) return;
+		this.lastBanner = banner;
+		this.log.info(`Portal: ${banner}`);
+	}
+
+	/** Si la mesa es de otro torneo, el engine mezcló a esta cuenta con otro torneo activo. */
+	checkRoomTournament(room) {
+		const roomTournament = roomTournamentId(room);
+		if (!this.tournamentId || !roomTournament || roomTournament === this.tournamentId) return;
+		this.log.warn(
+			`This table belongs to tournament ${roomTournament}, but this run is for tournament ${this.tournamentId} ` +
+				`("${this.tournament.slug}"). The account is enrolled in another active tournament and the engine sent it there.`,
+		);
+	}
+
+	/** Número del torneo de esta corrida, tomado de la sesión que guarda el propio juego tras el login. */
+	async readTournamentId() {
+		for (let attempt = 0; attempt < 6 && !this.abort.signal.aborted; attempt++) {
+			const id = await this.session.page
+				.evaluate(() => {
+					try {
+						return Number(JSON.parse(sessionStorage.getItem("Context") ?? "{}").id_tournament) || null;
+					} catch {
+						return null;
+					}
+				})
+				.catch(() => null);
+			if (id) {
+				this.tournamentId = id;
+				this.log.info(`Tournament id: ${id}`);
+				return;
+			}
+			await sleep(500, this.abort.signal);
 		}
 	}
 }

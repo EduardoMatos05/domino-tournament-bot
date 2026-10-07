@@ -20,8 +20,6 @@ export const SEL = {
 
 	modalHeader: "div.fixed.z-50 header",
 	modalButton: "div.fixed.z-50 button",
-
-	portalPlayers: ".portal li",
 };
 
 export const handTileSelector = (label) => `[data-game-table] button[aria-label="${label}"]`;

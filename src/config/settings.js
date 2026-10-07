@@ -1,7 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { DEFAULT_PLAYER_COUNT, MAX_PLAYERS, PLAYER_COUNTS, SPEED, USERNAME_PATTERN } from "./defaults.js";
+import {
+	DEFAULT_PLAYER_COUNT,
+	MAX_PLAYERS,
+	MIN_PLAYERS,
+	SPEED,
+	USERNAME_PATTERN,
+	isValidPlayerCount,
+} from "./defaults.js";
 import { parseTournamentUrl } from "./tournamentUrl.js";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -22,7 +29,7 @@ export function loadSettings(file = SETTINGS_FILE) {
 		const saved = JSON.parse(fs.readFileSync(file, "utf8"));
 		base.tournamentUrl = typeof saved.tournamentUrl === "string" ? saved.tournamentUrl : "";
 		if (Number.isFinite(saved.speed)) base.speed = saved.speed;
-		if (PLAYER_COUNTS.includes(saved.playerCount)) base.playerCount = saved.playerCount;
+		if (isValidPlayerCount(saved.playerCount)) base.playerCount = saved.playerCount;
 		if (Array.isArray(saved.players)) {
 			base.players = base.players.map((_, i) => ({
 				username: String(saved.players[i]?.username ?? ""),
@@ -50,8 +57,8 @@ export function validateRunConfig(input) {
 	}
 
 	const players = input?.players;
-	if (!Array.isArray(players) || !PLAYER_COUNTS.includes(players.length)) {
-		throw new Error(`Se necesitan ${PLAYER_COUNTS.join(" u ")} jugadores.`);
+	if (!Array.isArray(players) || !isValidPlayerCount(players.length)) {
+		throw new Error(`El número de jugadores debe ser par, de ${MIN_PLAYERS} a ${MAX_PLAYERS}.`);
 	}
 	const seen = new Set();
 	const accounts = players.map((p, i) => {

@@ -3,7 +3,8 @@ const form = $("form");
 const speed = $("speed");
 const logEl = $("log");
 
-const MAX_PLAYERS = 8;
+const MIN_PLAYERS = 2;
+const MAX_PLAYERS = 16;
 
 // Campos de usuario y contraseña de cada jugador (los que sobran se ocultan según el número elegido).
 $("players").innerHTML = Array.from(
@@ -13,7 +14,11 @@ $("players").innerHTML = Array.from(
 		<label>Password<input type="password" data-pass="${n}" /></label></fieldset>`,
 ).join("");
 
-const playerCount = () => Number(form.querySelector('input[name="count"]:checked').value);
+const countSelect = $("count");
+for (let n = MIN_PLAYERS; n <= MAX_PLAYERS; n += 2) {
+	countSelect.insertAdjacentHTML("beforeend", `<option value="${n}">${n} jugadores</option>`);
+}
+const playerCount = () => Number(countSelect.value);
 
 function applyPlayerCount() {
 	const count = playerCount();
@@ -23,7 +28,7 @@ function applyPlayerCount() {
 		for (const input of fs.querySelectorAll("input")) input.required = active;
 	});
 }
-form.querySelectorAll('input[name="count"]').forEach((r) => r.addEventListener("change", applyPlayerCount));
+countSelect.addEventListener("change", applyPlayerCount);
 applyPlayerCount();
 
 const fmt = (v) => `${Number(v).toFixed(1)}s`;
@@ -74,7 +79,7 @@ function renderState(state) {
 	$("start").disabled = state.running;
 	$("stop").disabled = !state.running && state.players.every((p) => p.status === "Stopped");
 	$("stop").textContent = state.running ? "STOP" : "CLOSE BROWSERS";
-	for (const el of form.querySelectorAll("input:not(#speed)")) el.disabled = state.running;
+	for (const el of form.querySelectorAll("input:not(#speed), select")) el.disabled = state.running;
 
 	$("status").innerHTML = state.players
 		.map((p) => {
@@ -107,7 +112,7 @@ async function init() {
 	speed.step = speedRange.step;
 	speed.value = state.running ? state.speed : settings.speed;
 	$("speedValue").textContent = fmt(speed.value);
-	form.querySelector(`input[name="count"][value="${settings.playerCount}"]`).checked = true;
+	countSelect.value = String(settings.playerCount);
 	applyPlayerCount();
 	settings.players.forEach((p, n) => {
 		document.querySelector(`[data-user="${n}"]`).value = p.username;
