@@ -3,6 +3,7 @@
  * El frontend no tiene data-testid; estos selectores salen de su código:
  *   - mano:        gamePlatform/components/Chip.tsx        (button[aria-label="Jugar ficha 5-3"])
  *   - mesa:        components/Game/DominoView.tsx          ([data-game-table], img[alt="turno de jugador"])
+ *   - partida:     components/Game/DominoView.tsx          (recuadro "Certamen/Concurso: ..." / "Partida: N")
  *   - modal lado:  gamePlatform/components/ModalGame.tsx   (#modalGame)
  *   - modales:     components/Modal/ModalLayout.tsx        (div.fixed.z-50 > header)
  *   - login:       components/Login/Login.tsx              (input[name=user_email|user_password])
@@ -36,6 +37,9 @@ export const TEXT = {
 	tournamentFinished: "Certamen finalizado",
 	tournamentCancelled: "Torneo cancelado",
 	lobbyClosed: "El portal de comunicación estará disponible",
+	// Recuadro de la mesa con la partida en juego (se ve desde la mesa de espera, junto a "Confirmar asistencia").
+	eventLine: /Certamen\/Concurso:[ \t]*([^\n]*)/,
+	gameLine: /Partida:[ \t]*(\d+)/,
 };
 
 // Nombre de archivo del icono de turno (Vite le añade un hash).

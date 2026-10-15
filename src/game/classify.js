@@ -85,6 +85,22 @@ const PORTAL_BANNERS = [
 /** Título de la fase que muestra el portal en este momento, o null. */
 export const portalBanner = (text) => PORTAL_BANNERS.find((title) => String(text ?? "").includes(title)) ?? null;
 
+// Fases del portal en las que el torneo espera la siguiente partida (cuenta regresiva).
+export const WAITING_BANNERS = ["Inicio del torneo", "Siguiente juego"];
+
+/**
+ * Qué partida se juega en esta mesa, según su recuadro "Certamen/Concurso: Certamen 1" / "Partida: 2".
+ * -> { name: "Certamen 1", event: 1, game: 2 }, o null si la mesa aún no lo muestra.
+ * El número del certamen/concurso es el de su nombre (null si el nombre no termina en número).
+ */
+export function roomGame(text) {
+	const name = TEXT.eventLine.exec(String(text ?? ""))?.[1].trim();
+	const game = Number(TEXT.gameLine.exec(String(text ?? ""))?.[1]);
+	if (!name || name === "N/D" || !Number.isInteger(game) || game < 1) return null;
+	const event = /(\d+)$/.exec(name)?.[1];
+	return { name, event: event ? Number(event) : null, game };
+}
+
 /** "TOUR_151_RUN_..._MESA_1" -> 151 (número del torneo al que pertenece la mesa), o null. */
 export const roomTournamentId = (room) => {
 	const m = /^TOUR_(\d+)_/.exec(String(room ?? ""));

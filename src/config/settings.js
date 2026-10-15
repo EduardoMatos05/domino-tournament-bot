@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
 	DEFAULT_PLAYER_COUNT,
+	MAX_GAME_NUMBER,
 	MAX_PLAYERS,
 	MIN_PLAYERS,
 	SPEED,
@@ -20,6 +21,7 @@ export function emptySettings() {
 		speed: SPEED.default,
 		playerCount: DEFAULT_PLAYER_COUNT,
 		players: Array.from({ length: MAX_PLAYERS }, () => ({ username: "", password: "" })),
+		disconnects: [],
 	};
 }
 
@@ -35,6 +37,11 @@ export function loadSettings(file = SETTINGS_FILE) {
 				username: String(saved.players[i]?.username ?? ""),
 				password: String(saved.players[i]?.password ?? ""),
 			}));
+		}
+		try {
+			base.disconnects = parseDisconnects(saved.disconnects, MAX_PLAYERS);
+		} catch {
+			// desconexiones guardadas inválidas: se descartan
 		}
 	} catch {
 		// sin archivo guardado todavía
@@ -77,5 +84,32 @@ export function validateRunConfig(input) {
 		return { username, password };
 	});
 
-	return { tournament, speed, accounts };
+	const disconnects = parseDisconnects(input?.disconnects, accounts.length);
+	return { tournament, speed, accounts, disconnects };
+}
+
+/**
+ * Desconexiones programadas: [{ player, off: {event, game}, on: {event, game} }], con player = índice del
+ * jugador (0..N-1) y event = número del certamen/concurso. Se desconecta en `off` y vuelve en `on`.
+ */
+export function parseDisconnects(input, playerCount) {
+	if (input == null) return [];
+	if (!Array.isArray(input)) throw new Error("Las desconexiones programadas no son válidas.");
+	const isNumber = (n) => Number.isInteger(n) && n >= 1 && n <= MAX_GAME_NUMBER;
+	return input.map((d, i) => {
+		const name = `Desconexión ${i + 1}`;
+		const { player, off, on } = d ?? {};
+		if (!Number.isInteger(player) || player < 0 || player >= playerCount) {
+			throw new Error(`${name}: elige el bot que se desconecta.`);
+		}
+		for (const point of [off, on]) {
+			if (!isNumber(point?.event) || !isNumber(point?.game)) {
+				throw new Error(`${name}: el certamen/concurso y la partida deben ser números de 1 a ${MAX_GAME_NUMBER}.`);
+			}
+		}
+		if (on.event === off.event && on.game <= off.game) {
+			throw new Error(`${name}: la partida de regreso debe ser posterior a la de desconexión.`);
+		}
+		return { player, off: { event: off.event, game: off.game }, on: { event: on.event, game: on.game } };
+	});
 }

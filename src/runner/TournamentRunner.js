@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { LAUNCH_STAGGER_MS } from "../config/defaults.js";
 import { logger } from "../logger/logger.js";
 import { PlayerBot, STATUS } from "../players/PlayerBot.js";
+import { TournamentWatch, pointLabel } from "../players/disconnects.js";
 import { sleep } from "../game/timing.js";
 
 /**
@@ -39,7 +40,7 @@ export class TournamentRunner extends EventEmitter {
 		if (this.running) this.log.info(`Game speed changed to ${seconds}s`);
 	}
 
-	async start({ tournament, speed, accounts }) {
+	async start({ tournament, speed, accounts, disconnects = [] }) {
 		if (this.running) throw new Error("Ya hay una ejecución en curso.");
 		// Navegadores que quedaron abiertos mostrando el resultado de la ejecución anterior.
 		await Promise.allSettled(this.bots.map((b) => b.stop()));
@@ -53,7 +54,15 @@ export class TournamentRunner extends EventEmitter {
 		this.log.info(`Tournament: ${tournament.slug} (${tournament.origin})`);
 		this.log.info(`Players (${accounts.length}): ${accounts.map((a) => a.username).join(", ")}`);
 		this.log.info(`Game speed: ${speed}s`);
+		for (const d of disconnects) {
+			this.log.info(
+				`Scheduled disconnect: Player ${d.player + 1} (${accounts[d.player].username}) ` +
+					`at ${pointLabel(d.off)}, back at ${pointLabel(d.on)}`,
+			);
+		}
 
+		// Lo que ve cada bot se comparte: uno desconectado sabe por los demás cuándo volver.
+		const watch = new TournamentWatch();
 		this.bots = accounts.map(
 			(account, index) =>
 				new PlayerBot({
@@ -65,6 +74,8 @@ export class TournamentRunner extends EventEmitter {
 					logger: logger.for(`Player ${index + 1}`),
 					headless: this.headless,
 					onChange: () => this.emit("state", this.snapshot()),
+					disconnects: disconnects.filter((d) => d.player === index),
+					watch,
 				}),
 		);
 		this.emit("state", this.snapshot());

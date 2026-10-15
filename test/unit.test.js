@@ -3,10 +3,11 @@ import test from "node:test";
 import { SPEED_JITTER } from "../src/config/defaults.js";
 import { validateRunConfig } from "../src/config/settings.js";
 import { parseTournamentUrl } from "../src/config/tournamentUrl.js";
-import { KIND, classify, portalBanner, roomTournamentId } from "../src/game/classify.js";
+import { KIND, classify, portalBanner, roomGame, roomTournamentId } from "../src/game/classify.js";
 import { tileName } from "../src/game/selectors.js";
 import { moveDelayMs, shuffle } from "../src/game/timing.js";
 import { describeLoginFailure } from "../src/players/auth.js";
+import { DisconnectSchedule, TournamentWatch } from "../src/players/disconnects.js";
 
 test("parseTournamentUrl toma el slug y apunta a login y portal", () => {
 	const t = parseTournamentUrl("https://plataforma.amigosxeldomino.com/mi-torneo/portal-comunicacion?x=1");
@@ -123,4 +124,85 @@ test("roomTournamentId saca el número del torneo del nombre de la mesa", () => 
 	assert.equal(roomTournamentId("TOUR_146_RUN_1_MESA_2_DEFAULT_x"), 146);
 	assert.equal(roomTournamentId("sala-cualquiera"), null);
 	assert.equal(roomTournamentId(undefined), null);
+});
+
+// ------------------------------------------------------------------ desconexiones programadas
+
+test("roomGame lee el certamen/concurso y la partida del recuadro de la mesa", () => {
+	const table = (event, game) => `Confirmar asistencia\nConfirmar\n1\nCertamen/Concurso: ${event}\nPartida: ${game}\nReloj general: N/D`;
+	assert.deepEqual(roomGame(table("Certamen 1", 2)), { name: "Certamen 1", event: 1, game: 2 });
+	assert.deepEqual(roomGame(table("Concurso 3", 12)), { name: "Concurso 3", event: 3, game: 12 });
+	assert.deepEqual(roomGame(table("Mi certamen", 1)), { name: "Mi certamen", event: null, game: 1 });
+	assert.equal(roomGame(table("N/D", 2)), null, "el engine aún no dijo el certamen");
+	assert.equal(roomGame(table("Certamen 1", "N/D")), null, "el engine aún no dijo la partida");
+	assert.equal(roomGame("Partida pausada"), null);
+	assert.equal(roomGame(undefined), null);
+});
+
+test("validateRunConfig valida las desconexiones programadas", () => {
+	const base = { tournamentUrl: "https://plataforma.x.com/t/login", speed: 2, players: players("a", "b", "c", "d") };
+	const plan = (...disconnects) => validateRunConfig({ ...base, disconnects }).disconnects;
+	const at = (event, game) => ({ event, game });
+
+	assert.deepEqual(validateRunConfig(base).disconnects, [], "sin desconexiones");
+	assert.deepEqual(plan({ player: 3, off: at(1, 2), on: at(1, 3) }), [{ player: 3, off: at(1, 2), on: at(1, 3) }]);
+	assert.equal(plan({ player: 0, off: at(1, 4), on: at(2, 1) }).length, 1, "puede volver en otro certamen/concurso");
+
+	assert.throws(() => plan({ player: 4, off: at(1, 1), on: at(1, 2) }), /elige el bot/, "solo hay 4 jugadores");
+	assert.throws(() => plan({ player: null, off: at(1, 1), on: at(1, 2) }), /elige el bot/);
+	assert.throws(() => plan({ player: 0, off: at(0, 1), on: at(1, 2) }), /números de 1 a 99/);
+	assert.throws(() => plan({ player: 0, off: at(1, 1), on: at(1, 1.5) }), /números de 1 a 99/);
+	assert.throws(() => plan({ player: 0, off: at(1, 3), on: at(1, 3) }), /posterior/);
+	assert.throws(() => plan({ player: 0, off: at(1, 3), on: at(1, 2) }), /posterior/);
+	assert.throws(() => validateRunConfig({ ...base, disconnects: "x" }), /no son válidas/);
+});
+
+const game = (name, number) => ({ name, event: Number(/\d+$/.exec(name)?.[0]) || null, game: number });
+
+test("DisconnectSchedule: se activa en su partida de desconexión y termina en la de regreso", () => {
+	const schedule = new DisconnectSchedule([{ off: { event: 1, game: 2 }, on: { event: 1, game: 4 } }]);
+	assert.equal(schedule.see(game("Certamen 1", 1)).started.length, 0);
+	assert.equal(schedule.active, null);
+
+	const [rule] = schedule.see(game("Certamen 1", 2)).started;
+	assert.equal(schedule.active, rule);
+	schedule.see(game("Certamen 1", 3));
+	assert.equal(schedule.active, rule, "sigue desconectado hasta la partida de regreso");
+
+	assert.deepEqual(schedule.see(game("Certamen 1", 4)).ended, [rule]);
+	assert.equal(schedule.active, null);
+	schedule.see(game("Certamen 1", 2));
+	assert.equal(schedule.active, null, "una desconexión ocurre una sola vez");
+});
+
+test("DisconnectSchedule: el número del certamen/concurso sale del nombre y se encadenan desconexiones", () => {
+	const schedule = new DisconnectSchedule([
+		{ off: { event: 2, game: 1 }, on: { event: 2, game: 2 } },
+		{ off: { event: 2, game: 2 }, on: { event: 2, game: 3 } },
+	]);
+	schedule.see(game("Concurso 2", 1));
+	assert.ok(schedule.active, "Concurso 2 cuenta como certamen/concurso 2");
+	const change = schedule.see(game("Concurso 2", 2));
+	assert.equal(change.ended.length, 1, "termina la primera...");
+	assert.equal(change.started.length, 1, "...y en la misma partida empieza la segunda");
+	assert.ok(schedule.active);
+	schedule.see(game("Concurso 2", 3));
+	assert.equal(schedule.active, null);
+	assert.equal(new DisconnectSchedule([{ off: { event: 1, game: 1 }, on: { event: 1, game: 2 } }]).see(game("Mi certamen", 1)).started.length, 0);
+});
+
+test("TournamentWatch: partidas sin repetir y quién sigue mirando el juego", () => {
+	const watch = new TournamentWatch();
+	watch.sawGame(game("Certamen 1", 1));
+	watch.sawGame(game("Certamen 1", 1));
+	watch.sawGame(game("Concurso 1", 1));
+	watch.sawGame(game("Certamen 1", 1)); // lectura vieja de una mesa que todavía mostraba la partida anterior
+	assert.deepEqual(watch.games.map((g) => `${g.name} · ${g.game}`), ["Certamen 1 · 1", "Concurso 1 · 1"]);
+
+	assert.equal(watch.othersWatching(0), false);
+	watch.look(0);
+	assert.equal(watch.othersWatching(0), false, "el propio jugador no cuenta");
+	watch.look(1);
+	assert.equal(watch.othersWatching(0), true);
+	assert.equal(watch.othersWatching(0, Date.now() + 60_000), false, "hace mucho que no mira");
 });

@@ -1,4 +1,6 @@
 import {
+	ALONE_RECONNECT_MS,
+	GAME_INFO_WAIT_MS,
 	HEARTBEAT_LOG_MS,
 	KEEPALIVE_MS,
 	LOBBY_CLOSED_RELOAD_MS,
@@ -13,12 +15,13 @@ import {
 	UNCONFIRMED_BACKOFF_MS,
 } from "../config/defaults.js";
 import { launchPlayerBrowser } from "../browser/launch.js";
-import { KIND, classify, isRoom, portalBanner, roomTournamentId } from "../game/classify.js";
+import { KIND, WAITING_BANNERS, classify, isRoom, portalBanner, roomGame, roomTournamentId } from "../game/classify.js";
 import { playRandomMove, watchDialogs } from "../game/moves.js";
 import { TEXT } from "../game/selectors.js";
 import { takeSnapshot } from "../game/snapshot.js";
 import { moveDelayMs, sleep } from "../game/timing.js";
 import { LoginError, goToPortal, login } from "./auth.js";
+import { DisconnectSchedule, TournamentWatch, gameLabel, pointLabel } from "./disconnects.js";
 
 export const STATUS = {
 	IDLE: "Idle",
@@ -32,6 +35,7 @@ export const STATUS = {
 	MY_TURN: "My turn",
 	BETWEEN: "Waiting for next match",
 	PAUSED: "Paused",
+	DISCONNECTED: "Disconnected", // desconexión programada: ventana cerrada hasta la espera de la siguiente partida
 	FINISHED: "Tournament finished",
 	CANCELLED: "Tournament cancelled",
 	ERROR: "Error",
@@ -68,8 +72,10 @@ export class PlayerBot {
 	 * @param {object} o.logger  logger.for("Player N")
 	 * @param {boolean} o.headless
 	 * @param {(bot: PlayerBot) => void} o.onChange
+	 * @param {{off:{event:number,game:number}, on:{event:number,game:number}}[]} [o.disconnects]  desconexiones programadas de este jugador
+	 * @param {TournamentWatch} [o.watch]  lo que ven todos los bots de la corrida (compartido)
 	 */
-	constructor({ index, total, account, tournament, speed, logger, headless, onChange }) {
+	constructor({ index, total, account, tournament, speed, logger, headless, onChange, disconnects = [], watch }) {
 		this.index = index;
 		this.total = total;
 		this.name = `Player ${index + 1}`;
@@ -108,6 +114,13 @@ export class PlayerBot {
 		this.warnedFace = false;
 		this.lastText = "";
 		this.finished = false;
+
+		this.schedule = new DisconnectSchedule(disconnects);
+		this.watch = watch ?? new TournamentWatch();
+		this.gamesSeen = 0; // cuántas partidas de watch.games ya se revisaron contra las desconexiones
+		this.room = null; // mesa actual y su partida (cuando la mesa la muestra)
+		this.roomSince = 0;
+		this.game = null;
 	}
 
 	get isTerminal() {
@@ -195,7 +208,8 @@ export class PlayerBot {
 				}
 				consecutiveErrors += 1;
 				this.log.error(`Error: ${error.message.split("\n")[0]}`);
-				if (this.session?.page.isClosed()) throw new Error("the browser window was closed");
+				if (!this.session) throw error; // no se pudo volver a abrir el navegador tras una desconexión programada
+				if (this.session.page.isClosed()) throw new Error("the browser window was closed");
 				if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) throw new Error("too many consecutive errors");
 				await sleep(1_000, this.abort.signal);
 			}
@@ -205,6 +219,7 @@ export class PlayerBot {
 
 	async step() {
 		const { page } = this.session;
+		this.watch.look(this.index);
 		await this.keepAlive(page);
 
 		const snap = await takeSnapshot(page);
@@ -212,6 +227,7 @@ export class PlayerBot {
 		const state = classify(snap);
 		this.noteTransition(state);
 		this.noteBanner(state, snap.text);
+		this.noteGame(state, snap.text);
 		if (Date.now() - this.lastLogAt >= HEARTBEAT_LOG_MS) {
 			this.log.info(`Still: ${this.status}${this.detail ? ` (${this.detail})` : ""}`);
 		}
@@ -240,17 +256,20 @@ export class PlayerBot {
 				this.setStatus(STATUS.WAITING_LOBBY);
 				return this.reloadPortalIf(LOBBY_CLOSED_RELOAD_MS);
 
-			case KIND.WAITING_MATCH:
+			case KIND.WAITING_MATCH: {
+				// Empezó la partida de desconexión y este jugador no tiene mesa en ella (la vieron otros bots).
+				const [rule] = this.syncGames();
+				if (rule) return this.goOffline(rule, `Scheduled disconnect at ${pointLabel(rule.off)}`);
 				this.setStatus(STATUS.WAITING_MATCH);
 				return this.reloadPortalIf(PORTAL_RELOAD_MS);
+			}
 
 			case KIND.TOURNAMENT_FINISHED:
 			case KIND.TOURNAMENT_CANCELLED:
 				return this.confirmTerminal(state.kind);
 
 			case KIND.CONFIRM_ATTENDANCE:
-				this.setStatus(STATUS.CONFIRMING);
-				return this.clickOnce(page, "attendance", TEXT.confirmButton, "Attendance confirmed");
+				return this.attend(page);
 
 			case KIND.HAND_ENDED:
 				this.setStatus(STATUS.WAITING_TURN, "Hand ended");
@@ -341,6 +360,88 @@ export class PlayerBot {
 		await sleep(1_000, this.abort.signal); // no martillar el click
 	}
 
+	/**
+	 * Mesa de espera. Antes de confirmar asistencia se mira qué partida es: si este jugador tiene una
+	 * desconexión programada que empieza (o sigue) en esta partida, cierra su ventana sin confirmar.
+	 */
+	async attend(page) {
+		this.setStatus(STATUS.CONFIRMING);
+		if (this.schedule.rules.length > 0) {
+			// La mesa muestra la partida junto con este modal; si tarda, se espera un poco antes de decidir.
+			if (!this.game && Date.now() - this.roomSince < GAME_INFO_WAIT_MS) return;
+			if (!this.game && this.cooldown("no-game-info", 60_000)) {
+				this.log.warn("This table does not show which game it is; scheduled disconnects only use what other bots saw");
+			}
+			const started = this.syncGames();
+			const rule = this.schedule.active;
+			if (rule) {
+				const at = this.game ? gameLabel(this.game) : null;
+				return this.goOffline(
+					rule,
+					started.includes(rule)
+						? `Scheduled disconnect at ${at ?? pointLabel(rule.off)}: not confirming attendance`
+						: `Still disconnected${at ? ` (${at})` : ""}: not confirming attendance`,
+				);
+			}
+		}
+		return this.clickOnce(page, "attendance", TEXT.confirmButton, "Attendance confirmed");
+	}
+
+	/**
+	 * Desconexión programada: cierra la ventana de este jugador y la vuelve a abrir cuando el torneo pasa a la
+	 * espera de la siguiente partida (lo avisan los demás bots). Si esa partida todavía no es la de regreso,
+	 * al llegar a su mesa se vuelve a desconectar sin confirmar.
+	 */
+	async goOffline(rule, reason) {
+		this.log.info(reason);
+		await this.closeSession();
+		this.log.info(`Window closed until the wait for the next game (back at ${pointLabel(rule.on)})`);
+		this.setStatus(STATUS.DISCONNECTED, `back at ${pointLabel(rule.on)}`);
+
+		const since = Date.now();
+		let aloneSince = null;
+		while (!this.abort.signal.aborted) {
+			if (this.watch.waitingAt > since) {
+				this.log.info("The tournament is waiting for the next game: reconnecting");
+				break;
+			}
+			// Si ningún otro bot mira el torneo nadie avisará: se vuelve a entrar de vez en cuando a revisarlo.
+			if (this.watch.othersWatching(this.index)) aloneSince = null;
+			else aloneSince ??= Date.now();
+			if (aloneSince && Date.now() - aloneSince >= ALONE_RECONNECT_MS) {
+				this.log.warn("No other bot is watching the tournament: reconnecting to check it myself");
+				break;
+			}
+			if (Date.now() - this.lastLogAt >= HEARTBEAT_LOG_MS) this.log.info(`Still: ${this.status} (${this.detail})`);
+			await sleep(1_000, this.abort.signal);
+		}
+		if (this.abort.signal.aborted) return;
+
+		this.lastKind = null;
+		this.lastBanner = null;
+		this.room = null;
+		this.game = null;
+		this.setStatus(STATUS.STARTING);
+		await this.openSession();
+		if (this.abort.signal.aborted) {
+			await this.closeSession(); // Stop mientras se abría el navegador
+			return;
+		}
+		await this.loginOrFail();
+	}
+
+	/** Avanza las desconexiones programadas con las partidas que vio cualquier bot. Devuelve las que acaban de empezar. */
+	syncGames() {
+		const started = [];
+		while (this.gamesSeen < this.watch.games.length) {
+			const game = this.watch.games[this.gamesSeen++];
+			const change = this.schedule.see(game);
+			started.push(...change.started);
+			if (change.ended.length > 0) this.log.info(`Back at ${gameLabel(game)}: playing normally`);
+		}
+		return started;
+	}
+
 	async clickOnce(page, key, buttonText, doneMessage) {
 		if (!this.cooldown(key, 2_000)) return;
 		const button = page.locator("div.fixed.z-50 button").filter({ hasText: new RegExp(`^\\s*${buttonText}\\s*$`) });
@@ -363,6 +464,7 @@ export class PlayerBot {
 	confirmTerminal(kind) {
 		this.terminalHits += 1;
 		if (this.terminalHits < TERMINAL_CONFIRMATIONS) return;
+		this.watch.sawWaiting(); // los bots desconectados vuelven a entrar para ver el final ellos también
 		if (kind === KIND.TOURNAMENT_FINISHED) {
 			this.log.info("Tournament finished");
 			this.finishWith(STATUS.FINISHED);
@@ -440,6 +542,22 @@ export class PlayerBot {
 		if (!banner || banner === this.lastBanner) return;
 		this.lastBanner = banner;
 		this.log.info(`Portal: ${banner}`);
+		if (WAITING_BANNERS.includes(banner)) this.watch.sawWaiting();
+	}
+
+	/** Qué partida es la de esta mesa: se registra una vez por mesa y se comparte con los demás bots. */
+	noteGame(state, text) {
+		if (!state.room) return;
+		if (state.room !== this.room) {
+			this.room = state.room;
+			this.roomSince = Date.now();
+			this.game = null;
+		}
+		if (this.game) return;
+		this.game = roomGame(text);
+		if (!this.game) return;
+		this.log.info(`Game: ${gameLabel(this.game)}`);
+		this.watch.sawGame(this.game);
 	}
 
 	/** Si la mesa es de otro torneo, el engine mezcló a esta cuenta con otro torneo activo. */

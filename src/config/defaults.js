@@ -33,6 +33,11 @@ export const HEARTBEAT_LOG_MS = 120_000;
 export const MAX_RELOGINS = 5;
 export const MAX_CONSECUTIVE_ERRORS = 10;
 
+// Desconexiones programadas (sección "Disconnect bots").
+export const MAX_GAME_NUMBER = 99; // tope de los cuadros de certamen/concurso y partida
+export const GAME_INFO_WAIT_MS = 5_000; // en la mesa de espera, cuánto esperar a leer qué partida es antes de confirmar igual
+export const ALONE_RECONNECT_MS = 60_000; // si ningún otro bot mira el torneo, cada cuánto vuelve uno desconectado a revisarlo
+
 export const WINDOW = { width: 800, height: 600 };
 export const LANGUAGE = "es"; // los selectores dependen de textos en español
 export const LAUNCH_STAGGER_MS = 1_500;

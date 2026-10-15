@@ -29,6 +29,19 @@
 				<div class="players" id="players"></div>
 
 				<div class="field">
+					<div class="field-head">
+						<span>Disconnect bots</span>
+						<button id="addDisconnect" type="button" class="add" title="Agregar desconexión" aria-label="Agregar desconexión">+</button>
+					</div>
+					<div class="disconnects" id="disconnects"></div>
+					<small class="hint">
+						Apaga la ventana de un bot en la mesa de espera de esa partida (así no confirma asistencia) y la vuelve
+						a encender cuando terminan las demás mesas y empieza la espera de la partida de regreso. El número de
+						certamen/concurso es el de su nombre ("Certamen 1", "Concurso 2"), como lo muestra la mesa.
+					</small>
+				</div>
+
+				<div class="field">
 					<span>Game Speed: <strong id="speedValue">2.0s</strong></span>
 					<div class="slider">
 						<small>0.5s</small>

@@ -1,6 +1,6 @@
 {
 	"name": "domino-tournament-bot",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "Bot externo que juega un torneo de dominó con 2 a 16 cuentas reales usando Playwright.",
 	"private": true,
 	"type": "module",
