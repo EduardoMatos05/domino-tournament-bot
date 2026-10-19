@@ -60,13 +60,16 @@ function setPoint(row, prefix, { event, game }) {
 	field(row, `${prefix}Game`).value = game;
 }
 
-function addDisconnect({ player = "", off = { event: 1, game: 1 }, on } = {}) {
+function addDisconnect({ player = "", off = { event: 1, game: 1 }, on, confirm = false } = {}) {
 	disconnectsEl.insertAdjacentHTML(
 		"beforeend",
 		`<div class="disconnect">
 			<label>Bot<select data-d="player" required></select></label>
 			${pointFields("Disconnect at", "off")}
 			${pointFields("Reconnect at", "on")}
+			<label class="confirm" title="Confirma asistencia y después se desconecta">
+				<input type="checkbox" data-d="confirm" />Confirmar
+			</label>
 			<button type="button" class="remove" title="Quitar" aria-label="Quitar desconexión">×</button>
 		</div>`,
 	);
@@ -74,6 +77,7 @@ function addDisconnect({ player = "", off = { event: 1, game: 1 }, on } = {}) {
 	fillPlayerSelect(field(row, "player"), player);
 	setPoint(row, "off", off);
 	setPoint(row, "on", on ?? { event: off.event, game: off.game + 1 });
+	field(row, "confirm").checked = confirm;
 }
 
 const readPoint = (row, prefix) => ({
@@ -84,7 +88,12 @@ const readPoint = (row, prefix) => ({
 const disconnectPlan = () =>
 	[...disconnectsEl.children].map((row) => {
 		const player = field(row, "player").value;
-		return { player: player === "" ? null : Number(player), off: readPoint(row, "off"), on: readPoint(row, "on") };
+		return {
+			player: player === "" ? null : Number(player),
+			off: readPoint(row, "off"),
+			on: readPoint(row, "on"),
+			confirm: field(row, "confirm").checked,
+		};
 	});
 
 $("addDisconnect").addEventListener("click", () => addDisconnect());

@@ -1,5 +1,6 @@
 import {
 	ALONE_RECONNECT_MS,
+	CONFIRM_THEN_LEAVE_MS,
 	GAME_INFO_WAIT_MS,
 	HEARTBEAT_LOG_MS,
 	KEEPALIVE_MS,
@@ -72,7 +73,7 @@ export class PlayerBot {
 	 * @param {object} o.logger  logger.for("Player N")
 	 * @param {boolean} o.headless
 	 * @param {(bot: PlayerBot) => void} o.onChange
-	 * @param {{off:{event:number,game:number}, on:{event:number,game:number}}[]} [o.disconnects]  desconexiones programadas de este jugador
+	 * @param {{off:{event:number,game:number}, on:{event:number,game:number}, confirm?:boolean}[]} [o.disconnects]  desconexiones programadas de este jugador
 	 * @param {TournamentWatch} [o.watch]  lo que ven todos los bots de la corrida (compartido)
 	 */
 	constructor({ index, total, account, tournament, speed, logger, headless, onChange, disconnects = [], watch }) {
@@ -362,7 +363,8 @@ export class PlayerBot {
 
 	/**
 	 * Mesa de espera. Antes de confirmar asistencia se mira qué partida es: si este jugador tiene una
-	 * desconexión programada que empieza (o sigue) en esta partida, cierra su ventana sin confirmar.
+	 * desconexión programada que empieza (o sigue) en esta partida, cierra su ventana sin confirmar
+	 * (o, si la desconexión lleva "Confirmar", después de confirmar).
 	 */
 	async attend(page) {
 		this.setStatus(STATUS.CONFIRMING);
@@ -376,12 +378,15 @@ export class PlayerBot {
 			const rule = this.schedule.active;
 			if (rule) {
 				const at = this.game ? gameLabel(this.game) : null;
-				return this.goOffline(
-					rule,
-					started.includes(rule)
-						? `Scheduled disconnect at ${at ?? pointLabel(rule.off)}: not confirming attendance`
-						: `Still disconnected${at ? ` (${at})` : ""}: not confirming attendance`,
-				);
+				const reason = started.includes(rule)
+					? `Scheduled disconnect at ${at ?? pointLabel(rule.off)}`
+					: `Still disconnected${at ? ` (${at})` : ""}`;
+				if (!rule.confirm) return this.goOffline(rule, `${reason}: not confirming attendance`);
+				// Si el botón todavía no está, se reintenta en la siguiente vuelta (la regla ya quedó activa).
+				if (!(await this.clickOnce(page, "attendance", TEXT.confirmButton, "Attendance confirmed"))) return;
+				await sleep(CONFIRM_THEN_LEAVE_MS, this.abort.signal); // el juego avisa al servidor por socket: que salga antes de cerrar
+				if (this.abort.signal.aborted) return;
+				return this.goOffline(rule, `${reason}: attendance confirmed, closing window`);
 			}
 		}
 		return this.clickOnce(page, "attendance", TEXT.confirmButton, "Attendance confirmed");
@@ -442,12 +447,14 @@ export class PlayerBot {
 		return started;
 	}
 
+	/** Devuelve si hizo click. */
 	async clickOnce(page, key, buttonText, doneMessage) {
-		if (!this.cooldown(key, 2_000)) return;
+		if (!this.cooldown(key, 2_000)) return false;
 		const button = page.locator("div.fixed.z-50 button").filter({ hasText: new RegExp(`^\\s*${buttonText}\\s*$`) });
-		if ((await button.count()) === 0) return;
+		if ((await button.count()) === 0) return false;
 		await button.first().click({ timeout: 3_000 });
 		this.log.info(doneMessage);
+		return true;
 	}
 
 	async relogin() {

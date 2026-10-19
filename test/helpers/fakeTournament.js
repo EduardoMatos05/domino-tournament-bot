@@ -19,9 +19,12 @@ export function startFakeTournament({
 	players = [], // con `games`: usuarios que juegan cada partida
 	countdownMs = 3_000, // espera antes de cada partida
 	defaultClockMs = 8_000, // tiempo para confirmar asistencia
+	abandonClockMs = Infinity, // si confirmó asistencia y no terminó su partida (se desconectó), cuándo se da por terminada
 } = {}) {
 	const moves = []; // lo que el "servidor" recibió: [{tile, side}]
-	const tour = games ? createTour({ games, players, countdownMs, defaultClockMs, roomTournamentId }) : null;
+	const tour = games
+		? createTour({ games, players, countdownMs, defaultClockMs, abandonClockMs, roomTournamentId })
+		: null;
 	const server = http.createServer(async (req, res) => {
 		const url = new URL(req.url, "http://x");
 		if (url.pathname.startsWith("/fake/")) {
@@ -80,7 +83,7 @@ export function startFakeTournament({
 }
 
 /** Fases compartidas del torneo de varias partidas. `confirmed` y `done` guardan "usuario#partida" (partida desde 1). */
-function createTour({ games, players, countdownMs, defaultClockMs, roomTournamentId }) {
+function createTour({ games, players, countdownMs, defaultClockMs, abandonClockMs, roomTournamentId }) {
 	const tour = {
 		index: 0, // partida actual (desde 0)
 		phase: "lobby", // lobby (esperando a que entren todos) -> countdown -> playing -> ... -> finished
@@ -101,7 +104,9 @@ function createTour({ games, players, countdownMs, defaultClockMs, roomTournamen
 		else if (tour.phase === "countdown" && elapsed >= countdownMs) set("playing");
 		else if (
 			tour.phase === "playing" &&
-			players.every((p) => tour.done.has(key(p)) || (!tour.confirmed.has(key(p)) && elapsed >= defaultClockMs))
+			players.every(
+				(p) => tour.done.has(key(p)) || elapsed >= (tour.confirmed.has(key(p)) ? abandonClockMs : defaultClockMs),
+			)
 		) {
 			tour.index += 1;
 			set(tour.index < games.length ? "countdown" : "finished");

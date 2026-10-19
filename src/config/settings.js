@@ -89,8 +89,9 @@ export function validateRunConfig(input) {
 }
 
 /**
- * Desconexiones programadas: [{ player, off: {event, game}, on: {event, game} }], con player = índice del
- * jugador (0..N-1) y event = número del certamen/concurso. Se desconecta en `off` y vuelve en `on`.
+ * Desconexiones programadas: [{ player, off: {event, game}, on: {event, game}, confirm }], con player = índice del
+ * jugador (0..N-1) y event = número del certamen/concurso. Se desconecta en `off` y vuelve en `on`; con `confirm`,
+ * antes de desconectarse confirma asistencia.
  */
 export function parseDisconnects(input, playerCount) {
 	if (input == null) return [];
@@ -98,7 +99,7 @@ export function parseDisconnects(input, playerCount) {
 	const isNumber = (n) => Number.isInteger(n) && n >= 1 && n <= MAX_GAME_NUMBER;
 	return input.map((d, i) => {
 		const name = `Desconexión ${i + 1}`;
-		const { player, off, on } = d ?? {};
+		const { player, off, on, confirm } = d ?? {};
 		if (!Number.isInteger(player) || player < 0 || player >= playerCount) {
 			throw new Error(`${name}: elige el bot que se desconecta.`);
 		}
@@ -110,6 +111,11 @@ export function parseDisconnects(input, playerCount) {
 		if (on.event === off.event && on.game <= off.game) {
 			throw new Error(`${name}: la partida de regreso debe ser posterior a la de desconexión.`);
 		}
-		return { player, off: { event: off.event, game: off.game }, on: { event: on.event, game: on.game } };
+		return {
+			player,
+			off: { event: off.event, game: off.game },
+			on: { event: on.event, game: on.game },
+			confirm: confirm === true,
+		};
 	});
 }

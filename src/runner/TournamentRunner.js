@@ -57,7 +57,8 @@ export class TournamentRunner extends EventEmitter {
 		for (const d of disconnects) {
 			this.log.info(
 				`Scheduled disconnect: Player ${d.player + 1} (${accounts[d.player].username}) ` +
-					`at ${pointLabel(d.off)}, back at ${pointLabel(d.on)}`,
+					`at ${pointLabel(d.off)}, back at ${pointLabel(d.on)}` +
+					(d.confirm ? " (confirms attendance before disconnecting)" : ""),
 			);
 		}
 

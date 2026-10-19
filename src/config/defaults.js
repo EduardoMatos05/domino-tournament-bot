@@ -37,6 +37,7 @@ export const MAX_CONSECUTIVE_ERRORS = 10;
 export const MAX_GAME_NUMBER = 99; // tope de los cuadros de certamen/concurso y partida
 export const GAME_INFO_WAIT_MS = 5_000; // en la mesa de espera, cuánto esperar a leer qué partida es antes de confirmar igual
 export const ALONE_RECONNECT_MS = 60_000; // si ningún otro bot mira el torneo, cada cuánto vuelve uno desconectado a revisarlo
+export const CONFIRM_THEN_LEAVE_MS = 2_000; // con "Confirmar": espera tras confirmar asistencia para que el aviso llegue al servidor
 
 export const WINDOW = { width: 800, height: 600 };
 export const LANGUAGE = "es"; // los selectores dependen de textos en español

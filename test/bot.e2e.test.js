@@ -229,6 +229,60 @@ test("desconexión programada: cierra la ventana sin confirmar y vuelve a jugar 
 	}
 });
 
+test("desconexión con Confirmar: confirma asistencia, cierra la ventana y vuelve en su partida de regreso", { timeout: 180_000 }, async () => {
+	const names = ["uno", "dos", "tres", "cuatro"];
+	const fake = await startFakeTournament({
+		games: [1, 2].map((game) => ({ event: "Certamen 1", game })),
+		players: names,
+		abandonClockMs: 20_000, // el engine termina la partida del que confirmó y se fue
+	});
+	const runner = new TournamentRunner({ headless: true });
+	const lines = [];
+	const collect = (line) => lines.push(line.text);
+	logger.on("line", collect);
+	try {
+		await runner.start({
+			tournament: parseTournamentUrl(`${fake.origin}/${fake.slug}/login`),
+			speed: 0.5,
+			accounts: names.map((username) => ({ username, password: "ok" })),
+			disconnects: [{ player: 1, off: { event: 1, game: 1 }, on: { event: 1, game: 2 }, confirm: true }],
+		});
+		const deadline = Date.now() + 170_000;
+		while (runner.running && Date.now() < deadline) await new Promise((r) => setTimeout(r, 500));
+
+		const final = runner.snapshot().players.map((p) => `${p.name}:${p.status}`);
+		assert.equal(runner.running, false, `sigue corriendo: ${final.join(", ")}`);
+		assert.ok(final.every((f) => f.endsWith(STATUS.FINISHED)), final.join(", "));
+
+		// "dos" confirmó las dos partidas, pero en la 1 no tiró ninguna ficha.
+		assert.deepEqual(
+			[...fake.tour.confirmed].sort(),
+			["cuatro#1", "cuatro#2", "dos#1", "dos#2", "tres#1", "tres#2", "uno#1", "uno#2"],
+		);
+		assert.equal(fake.moves.length, 3 * (3 + 4), "3 jugadas por cada partida jugada");
+
+		const log = lines.filter((l) => l.startsWith("[Player 2] ")).map((l) => l.slice("[Player 2] ".length));
+		let at = -1;
+		for (const text of [
+			"Attendance confirmed",
+			"Scheduled disconnect at Certamen 1 · Partida 1: attendance confirmed, closing window",
+			"Window closed until the wait for the next game (back at Certamen/Concurso 1 · Partida 2)",
+			"The tournament is waiting for the next game: reconnecting",
+			"Back at Certamen 1 · Partida 2: playing normally",
+			"Attendance confirmed",
+			"Tournament finished",
+		]) {
+			const next = log.findIndex((l, i) => i > at && l.startsWith(text));
+			assert.ok(next > at, `falta "${text}" (en ese orden) en:\n${log.join("\n")}`);
+			at = next;
+		}
+	} finally {
+		logger.off("line", collect);
+		await runner.stop();
+		fake.close();
+	}
+});
+
 test("si el servidor ignora las jugadas: un solo aviso por ficha, aviso de racha y reintentos cada vez más espaciados", { timeout: 120_000 }, async () => {
 	const fake = await startFakeTournament({ ignoreMoves: true });
 	const { bot, lines } = makeBot(fake, "ok");

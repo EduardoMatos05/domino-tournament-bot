@@ -32,6 +32,8 @@ cuando terminan las demás mesas y el portal pasa a "Siguiente juego", la vuelve
 
 - El número de certamen/concurso es el de su nombre ("Certamen 1", "Concurso 2"), como lo muestra la mesa. Si
   hay "Certamen 1" y "Concurso 1", el 1 vale para el que empiece primero.
+- Con la casilla **Confirmar** marcada, el bot primero pulsa "Confirmar" en la mesa de espera y luego cierra su
+  ventana (cuenta como presente, pero no juega). Si vuelve varias partidas después, hace lo mismo en cada una.
 - Si vuelve varias partidas después, se enciende en cada espera y se vuelve a apagar hasta llegar a la suya.
 - Necesita otro bot conectado que le avise; si no hay ninguno, revisa cada minuto.
 

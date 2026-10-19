@@ -145,7 +145,11 @@ test("validateRunConfig valida las desconexiones programadas", () => {
 	const at = (event, game) => ({ event, game });
 
 	assert.deepEqual(validateRunConfig(base).disconnects, [], "sin desconexiones");
-	assert.deepEqual(plan({ player: 3, off: at(1, 2), on: at(1, 3) }), [{ player: 3, off: at(1, 2), on: at(1, 3) }]);
+	assert.deepEqual(plan({ player: 3, off: at(1, 2), on: at(1, 3) }), [
+		{ player: 3, off: at(1, 2), on: at(1, 3), confirm: false },
+	]);
+	assert.equal(plan({ player: 3, off: at(1, 2), on: at(1, 3), confirm: true })[0].confirm, true, "con Confirmar");
+	assert.equal(plan({ player: 3, off: at(1, 2), on: at(1, 3), confirm: "sí" })[0].confirm, false, "solo true cuenta");
 	assert.equal(plan({ player: 0, off: at(1, 4), on: at(2, 1) }).length, 1, "puede volver en otro certamen/concurso");
 
 	assert.throws(() => plan({ player: 4, off: at(1, 1), on: at(1, 2) }), /elige el bot/, "solo hay 4 jugadores");

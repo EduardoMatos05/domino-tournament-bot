@@ -175,6 +175,19 @@ button.add {
 .disconnect input[type="number"] {
 	width: 92px;
 }
+.disconnect label.confirm {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-left: auto;
+	padding-bottom: 8px;
+	font-size: 13px;
+	color: inherit;
+	cursor: pointer;
+}
+.disconnect label.confirm + button.remove {
+	margin-left: 0;
+}
 button.remove {
 	margin-left: auto;
 	padding: 8px 12px;
