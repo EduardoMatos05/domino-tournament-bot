@@ -4,35 +4,58 @@ const speed = $("speed");
 const logEl = $("log");
 const disconnectsEl = $("disconnects");
 
-const MIN_PLAYERS = 2;
-const MAX_PLAYERS = 16;
+const MIN_PLAYERS = 1;
 const MAX_GAME = 99; // tope de los cuadros de certamen/concurso y partida
 
-// Campos de usuario y contraseña de cada jugador (los que sobran se ocultan según el número elegido).
-$("players").innerHTML = Array.from(
-	{ length: MAX_PLAYERS },
-	(_, n) => `<fieldset data-player="${n}"><legend>PLAYER ${n + 1}</legend>
-		<label>Username<input type="text" data-user="${n}" maxlength="8" pattern="[A-Za-z0-9]{1,8}" /></label>
-		<label>Password<input type="password" data-pass="${n}" /></label></fieldset>`,
-).join("");
+const playersEl = $("players");
+const countInput = $("count");
+// Cuentas escritas o guardadas, también las de espacios que ya no se muestran (vuelven si se sube el número).
+let accounts = [];
+const playerCount = () => playersEl.childElementCount;
 
-const countSelect = $("count");
-for (let n = MIN_PLAYERS; n <= MAX_PLAYERS; n += 2) {
-	countSelect.insertAdjacentHTML("beforeend", `<option value="${n}">${n} jugadores</option>`);
+/** Guarda lo escrito en los espacios visibles antes de regenerarlos. */
+function rememberAccounts() {
+	for (let n = 0; n < playerCount(); n++) {
+		accounts[n] = {
+			username: document.querySelector(`[data-user="${n}"]`).value,
+			password: document.querySelector(`[data-pass="${n}"]`).value,
+		};
+	}
 }
-const playerCount = () => Number(countSelect.value);
 
-function applyPlayerCount() {
-	const count = playerCount();
-	document.querySelectorAll("fieldset[data-player]").forEach((fs) => {
-		const active = Number(fs.dataset.player) < count;
-		fs.hidden = !active;
-		for (const input of fs.querySelectorAll("input")) input.required = active;
-	});
+/** Genera un espacio de usuario y contraseña por cada jugador. */
+function renderPlayers(count) {
+	playersEl.innerHTML = Array.from(
+		{ length: count },
+		(_, n) => `<fieldset data-player="${n}"><legend>PLAYER ${n + 1}</legend>
+			<label>Username<input type="text" data-user="${n}" maxlength="8" pattern="[A-Za-z0-9]{1,8}" required /></label>
+			<label>Password<input type="password" data-pass="${n}" required /></label></fieldset>`,
+	).join("");
+	for (let n = 0; n < count; n++) {
+		document.querySelector(`[data-user="${n}"]`).value = accounts[n]?.username ?? "";
+		document.querySelector(`[data-pass="${n}"]`).value = accounts[n]?.password ?? "";
+	}
+	countInput.value = String(count);
 	refreshDisconnectPlayers();
 }
-countSelect.addEventListener("change", applyPlayerCount);
-applyPlayerCount();
+
+function applyPlayerCount() {
+	$("error").textContent = "";
+	const count = Number(countInput.value);
+	if (!Number.isInteger(count) || count < MIN_PLAYERS) {
+		$("error").textContent = `El número de jugadores debe ser un entero de ${MIN_PLAYERS} o más.`;
+		return;
+	}
+	rememberAccounts();
+	renderPlayers(count);
+}
+$("applyCount").addEventListener("click", applyPlayerCount);
+// Enter en el número de jugadores genera los espacios en lugar de iniciar el torneo.
+countInput.addEventListener("keydown", (event) => {
+	if (event.key !== "Enter") return;
+	event.preventDefault();
+	applyPlayerCount();
+});
 
 // Desconexiones programadas: cada fila es un bot, cuándo se desconecta y cuándo vuelve (certamen/concurso y partida).
 const numberField = (label, key) =>
@@ -167,7 +190,7 @@ function renderState(state) {
 	$("stop").disabled = !state.running && state.players.every((p) => p.status === "Stopped");
 	$("stop").textContent = state.running ? "STOP" : "CLOSE BROWSERS";
 	// Las desconexiones se fijan al iniciar: no se editan con el torneo en marcha.
-	for (const el of form.querySelectorAll("input:not(#speed), select, #addDisconnect, .disconnect .remove")) {
+	for (const el of form.querySelectorAll("input:not(#speed), select, #applyCount, #addDisconnect, .disconnect .remove")) {
 		el.disabled = state.running;
 	}
 
@@ -202,12 +225,8 @@ async function init() {
 	speed.step = speedRange.step;
 	speed.value = state.running ? state.speed : settings.speed;
 	$("speedValue").textContent = fmt(speed.value);
-	countSelect.value = String(settings.playerCount);
-	applyPlayerCount();
-	settings.players.forEach((p, n) => {
-		document.querySelector(`[data-user="${n}"]`).value = p.username;
-		document.querySelector(`[data-pass="${n}"]`).value = p.password;
-	});
+	accounts = settings.players;
+	renderPlayers(settings.playerCount);
 	for (const d of settings.disconnects) addDisconnect(d);
 	renderState(state);
 

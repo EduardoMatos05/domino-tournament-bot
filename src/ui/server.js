@@ -71,7 +71,10 @@ export function createUiServer({ runner, port }) {
 							speed: config.speed,
 							playerCount: body.players.length,
 							// conserva las cuentas de los jugadores que esta vez no se usan
-							players: previous.players.map((p, i) => body.players[i] ?? p),
+							players: Array.from(
+								{ length: Math.max(previous.players.length, config.accounts.length) },
+								(_, i) => config.accounts[i] ?? previous.players[i],
+							),
 							disconnects: config.disconnects,
 						});
 					}

@@ -121,6 +121,14 @@ select:focus-visible {
 fieldset[hidden] {
 	display: none;
 }
+.count-row {
+	display: flex;
+	gap: 10px;
+	align-items: stretch;
+}
+.count-row input {
+	width: 120px;
+}
 .field-head {
 	display: flex;
 	align-items: center;

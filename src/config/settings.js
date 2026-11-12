@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import {
 	DEFAULT_PLAYER_COUNT,
 	MAX_GAME_NUMBER,
-	MAX_PLAYERS,
 	MIN_PLAYERS,
 	SPEED,
 	USERNAME_PATTERN,
@@ -20,7 +19,7 @@ export function emptySettings() {
 		tournamentUrl: "",
 		speed: SPEED.default,
 		playerCount: DEFAULT_PLAYER_COUNT,
-		players: Array.from({ length: MAX_PLAYERS }, () => ({ username: "", password: "" })),
+		players: [],
 		disconnects: [],
 	};
 }
@@ -33,13 +32,13 @@ export function loadSettings(file = SETTINGS_FILE) {
 		if (Number.isFinite(saved.speed)) base.speed = saved.speed;
 		if (isValidPlayerCount(saved.playerCount)) base.playerCount = saved.playerCount;
 		if (Array.isArray(saved.players)) {
-			base.players = base.players.map((_, i) => ({
-				username: String(saved.players[i]?.username ?? ""),
-				password: String(saved.players[i]?.password ?? ""),
+			base.players = saved.players.map((p) => ({
+				username: String(p?.username ?? ""),
+				password: String(p?.password ?? ""),
 			}));
 		}
 		try {
-			base.disconnects = parseDisconnects(saved.disconnects, MAX_PLAYERS);
+			base.disconnects = parseDisconnects(saved.disconnects, base.playerCount);
 		} catch {
 			// desconexiones guardadas inválidas: se descartan
 		}
@@ -65,7 +64,7 @@ export function validateRunConfig(input) {
 
 	const players = input?.players;
 	if (!Array.isArray(players) || !isValidPlayerCount(players.length)) {
-		throw new Error(`El número de jugadores debe ser par, de ${MIN_PLAYERS} a ${MAX_PLAYERS}.`);
+		throw new Error(`El número de jugadores debe ser un entero de ${MIN_PLAYERS} o más.`);
 	}
 	const seen = new Set();
 	const accounts = players.map((p, i) => {

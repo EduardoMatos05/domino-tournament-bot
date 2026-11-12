@@ -1,9 +1,8 @@
-// Cantidad de cuentas que maneja el bot: un número par de 2 a 16 (por defecto 8).
-// Una mesa es de 4 jugadores y un certamen online usa 8, 12 o 16; lo que el bot no cubra lo ocupan otras personas.
-export const MIN_PLAYERS = 2;
-export const MAX_PLAYERS = 16;
+// Cantidad de cuentas que maneja el bot: cualquier número entero desde 1, sin tope (por defecto 8).
+// Una mesa es de 4 jugadores; lo que el bot no cubra lo ocupan otras personas.
+export const MIN_PLAYERS = 1;
 export const DEFAULT_PLAYER_COUNT = 8;
-export const isValidPlayerCount = (n) => Number.isInteger(n) && n % 2 === 0 && n >= MIN_PLAYERS && n <= MAX_PLAYERS;
+export const isValidPlayerCount = (n) => Number.isInteger(n) && n >= MIN_PLAYERS;
 
 export const SPEED = { min: 0.5, max: 4.0, step: 0.1, default: 2.0 };
 // Variación aleatoria (±) aplicada a la espera antes de cada jugada.

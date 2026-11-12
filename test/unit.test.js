@@ -25,16 +25,15 @@ test("parseTournamentUrl corrige torneos.* a plataforma.* y rechaza URLs sin tor
 
 const players = (...names) => names.map((username) => ({ username, password: "x" }));
 
-test("validateRunConfig acepta una cantidad par de jugadores de 2 a 16, con usuarios distintos de hasta 8 caracteres", () => {
+test("validateRunConfig acepta cualquier cantidad de jugadores desde 1, con usuarios distintos de hasta 8 caracteres", () => {
 	const base = { tournamentUrl: "https://plataforma.x.com/t/login", speed: 2 };
 	const named = (n) => players(...Array.from({ length: n }, (_, i) => `u${i + 1}`));
 
-	for (const n of [2, 4, 6, 8, 10, 12, 14, 16]) {
+	for (const n of [1, 2, 3, 7, 16, 17, 40]) {
 		assert.equal(validateRunConfig({ ...base, players: named(n) }).accounts.length, n);
 	}
-	for (const n of [0, 1, 3, 5, 7, 15, 17, 18]) {
-		assert.throws(() => validateRunConfig({ ...base, players: named(n) }), /par, de 2 a 16/, `${n} jugadores`);
-	}
+	assert.throws(() => validateRunConfig({ ...base, players: [] }), /entero de 1 o más/);
+	assert.throws(() => validateRunConfig({ ...base }), /entero de 1 o más/);
 	assert.throws(() => validateRunConfig({ ...base, players: players("a1", "b2", "c3", "demasiadolargo") }), /1 a 8/);
 	assert.throws(() => validateRunConfig({ ...base, players: players("a1", "A1") }), /repetido/);
 	assert.throws(() => validateRunConfig({ ...base, speed: 9, players: players("a", "b") }), /velocidad/);

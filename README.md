@@ -1,6 +1,6 @@
 # Domino Tournament Bot — v0.3.0
 
-Juega un torneo **online** de dominó con **2 a 16 cuentas reales** (número par) desde una computadora: abre un
+Juega un torneo **online** de dominó con **las cuentas reales que quieras** (sin límite) desde una computadora: abre un
 Chromium por jugador, inicia sesión y tira fichas legales al azar hasta que el torneo termina. No modifica el
 juego: solo lee la pantalla y reacciona.
 
@@ -18,7 +18,7 @@ npm install   # la primera vez (también descarga Chromium)
 npm start     # abre http://127.0.0.1:4173
 ```
 
-1. Pega la URL del torneo, elige cuántos jugadores y escribe su usuario y contraseña.
+1. Pega la URL del torneo, escribe cuántos jugadores, pulsa Aceptar y llena su usuario y contraseña.
 2. Elige la velocidad: lo que tarda cada bot en tirar desde que empieza su turno (±20 %). Se puede cambiar en marcha.
 3. Opcional: **Disconnect bots** (ver abajo).
 4. Pulsa **START TOURNAMENT**. No cierres ni minimices las ventanas. **STOP** cierra todo; al terminar el torneo
