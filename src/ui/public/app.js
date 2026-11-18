@@ -9,19 +9,9 @@ const MAX_GAME = 99; // tope de los cuadros de certamen/concurso y partida
 
 const playersEl = $("players");
 const countInput = $("count");
-// Cuentas escritas o guardadas, también las de espacios que ya no se muestran (vuelven si se sube el número).
+// Cuentas con las que se llenan los espacios: las guardadas al abrir la página, o las de prueba al pulsar Aceptar.
 let accounts = [];
 const playerCount = () => playersEl.childElementCount;
-
-/** Guarda lo escrito en los espacios visibles antes de regenerarlos. */
-function rememberAccounts() {
-	for (let n = 0; n < playerCount(); n++) {
-		accounts[n] = {
-			username: document.querySelector(`[data-user="${n}"]`).value,
-			password: document.querySelector(`[data-pass="${n}"]`).value,
-		};
-	}
-}
 
 /** Genera un espacio de usuario y contraseña por cada jugador. */
 function renderPlayers(count) {
@@ -39,6 +29,9 @@ function renderPlayers(count) {
 	refreshDisconnectPlayers();
 }
 
+// Cuentas de prueba de la base de datos: el jugador N usa "torneoN" como usuario y como contraseña.
+const testAccount = (n) => ({ username: `torneo${n + 1}`, password: `torneo${n + 1}` });
+
 function applyPlayerCount() {
 	$("error").textContent = "";
 	const count = Number(countInput.value);
@@ -46,7 +39,8 @@ function applyPlayerCount() {
 		$("error").textContent = `El número de jugadores debe ser un entero de ${MIN_PLAYERS} o más.`;
 		return;
 	}
-	rememberAccounts();
+	// Aceptar llena todos los espacios con las cuentas de prueba; después se pueden editar a mano.
+	accounts = Array.from({ length: count }, (_, n) => testAccount(n));
 	renderPlayers(count);
 }
 $("applyCount").addEventListener("click", applyPlayerCount);

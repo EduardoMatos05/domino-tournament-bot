@@ -18,7 +18,8 @@ npm install   # la primera vez (también descarga Chromium)
 npm start     # abre http://127.0.0.1:4173
 ```
 
-1. Pega la URL del torneo, escribe cuántos jugadores, pulsa Aceptar y llena su usuario y contraseña.
+1. Pega la URL del torneo, escribe cuántos jugadores y pulsa Aceptar: se llenan solos con las cuentas de prueba
+   (jugador N = usuario `torneoN` y contraseña `torneoN`). Puedes cambiar cualquiera a mano antes de iniciar.
 2. Elige la velocidad: lo que tarda cada bot en tirar desde que empieza su turno (±20 %). Se puede cambiar en marcha.
 3. Opcional: **Disconnect bots** (ver abajo).
 4. Pulsa **START TOURNAMENT**. No cierres ni minimices las ventanas. **STOP** cierra todo; al terminar el torneo
