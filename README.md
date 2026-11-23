@@ -25,6 +25,20 @@ npm start     # abre http://127.0.0.1:4173
 4. Pulsa **START TOURNAMENT**. No cierres ni minimices las ventanas. **STOP** cierra todo; al terminar el torneo
    las ventanas quedan abiertas hasta **CLOSE BROWSERS**.
 
+## Cola de torneos (Next tournaments)
+
+Con **+** agregas otro torneo que se juega cuando termina el de arriba: su URL y cuántos jugadores. Puedes agregar
+varios; se juegan en orden, uno tras otro, sin tocar nada.
+
+- Cada torneo de la cola usa las cuentas de prueba `torneo1` … `torneoN` (N = jugadores de esa fila), ya inscritas.
+- Cuando todos los bots del torneo actual terminan, se cierran sus ventanas y se abren las del siguiente, que esperan
+  en el portal ("Waiting for lobby to open") hasta que abra.
+- Si un bot no alcanza a ver el final, se cierra a los 5 min de que otro lo vio, para que la cola no se atore.
+- La hora de inicio la pone el servidor, no el bot. Deja colchón entre torneos: si el anterior se alarga, el siguiente
+  empieza sin los bots y estos entran en cuanto el anterior termina.
+- La velocidad es la misma para todos; las desconexiones programadas solo aplican al primer torneo.
+- Cada torneo deja su propio archivo en `logs/`. **STOP** detiene el torneo actual y cancela el resto de la cola.
+
 ## Disconnect bots
 
 Con **+** agregas una fila: el bot, en qué certamen/concurso y partida se desconecta y en cuál vuelve (por

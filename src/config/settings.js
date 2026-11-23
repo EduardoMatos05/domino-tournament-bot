@@ -21,8 +21,13 @@ export function emptySettings() {
 		playerCount: DEFAULT_PLAYER_COUNT,
 		players: [],
 		disconnects: [],
+		queue: [],
 	};
 }
+
+/** Cuentas de prueba de la base de datos: el jugador N usa "torneoN" como usuario y como contraseña. */
+export const testAccounts = (count) =>
+	Array.from({ length: count }, (_, i) => ({ username: `torneo${i + 1}`, password: `torneo${i + 1}` }));
 
 export function loadSettings(file = SETTINGS_FILE) {
 	const base = emptySettings();
@@ -41,6 +46,11 @@ export function loadSettings(file = SETTINGS_FILE) {
 			base.disconnects = parseDisconnects(saved.disconnects, base.playerCount);
 		} catch {
 			// desconexiones guardadas inválidas: se descartan
+		}
+		if (Array.isArray(saved.queue)) {
+			base.queue = saved.queue
+				.filter((q) => typeof q?.tournamentUrl === "string" && isValidPlayerCount(q?.playerCount))
+				.map((q) => ({ tournamentUrl: q.tournamentUrl, playerCount: q.playerCount }));
 		}
 	} catch {
 		// sin archivo guardado todavía
@@ -84,7 +94,31 @@ export function validateRunConfig(input) {
 	});
 
 	const disconnects = parseDisconnects(input?.disconnects, accounts.length);
-	return { tournament, speed, accounts, disconnects };
+	const queue = parseQueue(input?.queue);
+	return { tournament, speed, accounts, disconnects, queue };
+}
+
+/**
+ * Cola de torneos que se juegan después del primero, uno tras otro: [{ tournamentUrl, playerCount }].
+ * Cada uno usa las cuentas de prueba torneo1..torneoN.
+ */
+export function parseQueue(input) {
+	if (input == null) return [];
+	if (!Array.isArray(input)) throw new Error("La cola de torneos no es válida.");
+	return input.map((q, i) => {
+		const name = `Torneo ${i + 2} de la cola`;
+		let tournament;
+		try {
+			tournament = parseTournamentUrl(q?.tournamentUrl);
+		} catch (error) {
+			throw new Error(`${name}: ${error.message}`);
+		}
+		const playerCount = Number(q?.playerCount);
+		if (!isValidPlayerCount(playerCount)) {
+			throw new Error(`${name}: el número de jugadores debe ser un entero de ${MIN_PLAYERS} o más.`);
+		}
+		return { tournament, accounts: testAccounts(playerCount) };
+	});
 }
 
 /**

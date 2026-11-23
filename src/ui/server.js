@@ -76,6 +76,10 @@ export function createUiServer({ runner, port }) {
 								(_, i) => config.accounts[i] ?? previous.players[i],
 							),
 							disconnects: config.disconnects,
+							queue: (body.queue ?? []).map((q) => ({
+								tournamentUrl: String(q.tournamentUrl).trim(),
+								playerCount: Number(q.playerCount),
+							})),
 						});
 					}
 					await runner.start(config);

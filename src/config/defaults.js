@@ -38,6 +38,10 @@ export const GAME_INFO_WAIT_MS = 5_000; // en la mesa de espera, cuánto esperar
 export const ALONE_RECONNECT_MS = 60_000; // si ningún otro bot mira el torneo, cada cuánto vuelve uno desconectado a revisarlo
 export const CONFIRM_THEN_LEAVE_MS = 2_000; // con "Confirmar": espera tras confirmar asistencia para que el aviso llegue al servidor
 
+// Cola de torneos: cuando un bot ya vio el final del torneo, los que sigan atorados se cierran tras este margen
+// para pasar al siguiente torneo de la cola.
+export const QUEUE_END_GRACE_MS = 5 * 60_000;
+
 export const WINDOW = { width: 800, height: 600 };
 export const LANGUAGE = "es"; // los selectores dependen de textos en español
 export const LAUNCH_STAGGER_MS = 1_500;

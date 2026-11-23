@@ -145,6 +145,50 @@ test("2 jugadores (el mínimo) a través del runner", { timeout: 90_000 }, async
 	}
 });
 
+test("cola de 2 torneos: al terminar el primero abre el segundo y lo juega hasta el final", { timeout: 150_000 }, async () => {
+	const first = await startFakeTournament({ slug: "primero", tournamentId: 146 });
+	const second = await startFakeTournament({ slug: "segundo", tournamentId: 147 });
+	const runner = new TournamentRunner({ headless: true });
+	const seen = [];
+	runner.on("state", (s) => {
+		const key = `${s.queue.position}/${s.queue.total}`;
+		if (seen.at(-1) !== key) seen.push(key);
+	});
+	try {
+		await runner.start({
+			tournament: parseTournamentUrl(`${first.origin}/primero/login`),
+			speed: 0.5,
+			accounts: [
+				{ username: "uno", password: "ok" },
+				{ username: "dos", password: "ok" },
+			],
+			queue: [
+				{
+					tournament: parseTournamentUrl(`${second.origin}/segundo/login`),
+					accounts: [
+						{ username: "tres", password: "ok" },
+						{ username: "cuatro", password: "ok" },
+					],
+				},
+			],
+		});
+		const deadline = Date.now() + 140_000;
+		while (runner.running && Date.now() < deadline) await new Promise((r) => setTimeout(r, 500));
+
+		const snap = runner.snapshot();
+		const final = snap.players.map((p) => `${p.username}:${p.status}`);
+		assert.equal(runner.running, false, final.join(", "));
+		assert.deepEqual(seen, ["1/2", "2/2"]);
+		assert.deepEqual(final, [`tres:${STATUS.FINISHED}`, `cuatro:${STATUS.FINISHED}`]);
+		assert.equal(first.moves.length, 2 * 3, "el primer torneo se jugó completo");
+		assert.equal(second.moves.length, 2 * 3, "el segundo torneo se jugó completo");
+	} finally {
+		await runner.stop();
+		first.close();
+		second.close();
+	}
+});
+
 test("avisa cuando el engine manda a la cuenta a una mesa de otro torneo", { timeout: 90_000 }, async () => {
 	const fake = await startFakeTournament({ tournamentId: 146, roomTournamentId: 151 });
 	const { bot, lines } = makeBot(fake, "ok");

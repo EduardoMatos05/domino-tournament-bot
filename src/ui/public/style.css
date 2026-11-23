@@ -202,6 +202,52 @@ button.remove {
 	font-size: 16px;
 	line-height: 1;
 }
+.queue {
+	display: grid;
+	gap: 10px;
+}
+.queue:empty {
+	display: none;
+}
+.queued {
+	display: flex;
+	align-items: flex-end;
+	gap: 10px 14px;
+	padding: 10px 12px 12px;
+	border: 1px solid var(--line);
+	border-radius: 8px;
+}
+.queued .num {
+	padding-bottom: 9px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--muted);
+}
+.queued label {
+	display: grid;
+	gap: 3px;
+	font-size: 12px;
+	color: var(--muted);
+}
+.queued label.url {
+	flex: 1;
+	min-width: 0;
+}
+.queued input[type="number"] {
+	width: 92px;
+}
+.queue-info {
+	margin: 0 0 8px;
+	font-size: 13px;
+}
+.queue-info .current {
+	font-weight: 700;
+	color: var(--accent);
+}
+.queue-info .done {
+	color: var(--muted);
+	text-decoration: line-through;
+}
 .slider {
 	display: flex;
 	align-items: center;
@@ -313,5 +359,11 @@ td.status {
 @media (max-width: 640px) {
 	.players {
 		grid-template-columns: 1fr;
+	}
+	.queued {
+		flex-wrap: wrap;
+	}
+	.queued label.url {
+		flex-basis: 100%;
 	}
 }

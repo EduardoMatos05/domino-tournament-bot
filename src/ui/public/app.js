@@ -129,6 +129,45 @@ $("players").addEventListener("input", (event) => {
 	if (event.target.dataset.user !== undefined) refreshDisconnectPlayers();
 });
 
+// Cola de torneos: cada fila es la URL de un torneo que se juega después del anterior y cuántas cuentas de prueba usa.
+const queueEl = $("queue");
+const queueField = (row, key) => row.querySelector(`[data-q="${key}"]`);
+
+function renumberQueue() {
+	[...queueEl.children].forEach((row, i) => {
+		row.querySelector(".num").textContent = `#${i + 2}`;
+	});
+}
+
+function addQueued({ tournamentUrl = "", playerCount: count = playerCount() || 4 } = {}) {
+	queueEl.insertAdjacentHTML(
+		"beforeend",
+		`<div class="queued">
+			<span class="num"></span>
+			<label class="url">Tournament URL<input type="url" data-q="url" placeholder="https://plataforma.dominio/otro-torneo/..." required /></label>
+			<label title="Usa las cuentas torneo1 … torneoN">Players<input type="number" data-q="count" min="1" step="1" inputmode="numeric" required /></label>
+			<button type="button" class="remove" title="Quitar" aria-label="Quitar torneo de la cola">×</button>
+		</div>`,
+	);
+	const row = queueEl.lastElementChild;
+	queueField(row, "url").value = tournamentUrl;
+	queueField(row, "count").value = String(count);
+	renumberQueue();
+}
+
+const queuePlan = () =>
+	[...queueEl.children].map((row) => ({
+		tournamentUrl: queueField(row, "url").value.trim(),
+		playerCount: Number(queueField(row, "count").value),
+	}));
+
+$("addQueue").addEventListener("click", () => addQueued());
+queueEl.addEventListener("click", (event) => {
+	if (!event.target.closest(".remove")) return;
+	event.target.closest(".queued").remove();
+	renumberQueue();
+});
+
 const fmt = (v) => `${Number(v).toFixed(1)}s`;
 speed.addEventListener("input", () => {
 	$("speedValue").textContent = fmt(speed.value);
@@ -162,6 +201,7 @@ form.addEventListener("submit", async (event) => {
 				password: document.querySelector(`[data-pass="${n}"]`).value,
 			})),
 			disconnects: disconnectPlan(),
+			queue: queuePlan(),
 		});
 	} catch (error) {
 		$("error").textContent = error.message;
@@ -184,9 +224,23 @@ function renderState(state) {
 	$("stop").disabled = !state.running && state.players.every((p) => p.status === "Stopped");
 	$("stop").textContent = state.running ? "STOP" : "CLOSE BROWSERS";
 	// Las desconexiones se fijan al iniciar: no se editan con el torneo en marcha.
-	for (const el of form.querySelectorAll("input:not(#speed), select, #applyCount, #addDisconnect, .disconnect .remove")) {
+	for (const el of form.querySelectorAll(
+		"input:not(#speed), select, #applyCount, #addDisconnect, .disconnect .remove, #addQueue, .queued .remove",
+	)) {
 		el.disabled = state.running;
 	}
+
+	// Con cola: qué torneo se juega ahora y cuáles faltan.
+	const queue = state.queue ?? { total: 0 };
+	$("queueInfo").hidden = queue.total < 2;
+	$("queueInfo").innerHTML =
+		`Tournament ${queue.position} of ${queue.total}: ` +
+		(queue.slugs ?? [])
+			.map((slug, i) => {
+				const cls = i + 1 === queue.position ? (state.running ? "current" : "") : i + 1 < queue.position ? "done" : "";
+				return `<span class="${cls}">${escapeHtml(slug)}</span>`;
+			})
+			.join(" → ");
 
 	$("status").innerHTML = state.players
 		.map((p) => {
@@ -222,6 +276,7 @@ async function init() {
 	accounts = settings.players;
 	renderPlayers(settings.playerCount);
 	for (const d of settings.disconnects) addDisconnect(d);
+	for (const q of settings.queue ?? []) addQueued(q);
 	renderState(state);
 
 	const events = new EventSource("/api/events");

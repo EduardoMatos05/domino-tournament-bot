@@ -48,6 +48,21 @@
 				</div>
 
 				<div class="field">
+					<div class="field-head">
+						<span>Next tournaments (queue)</span>
+						<button id="addQueue" type="button" class="add" title="Agregar torneo a la cola" aria-label="Agregar torneo a la cola">+</button>
+					</div>
+					<div class="queue" id="queue"></div>
+					<small class="hint">
+						Torneos que se juegan después del de arriba, uno tras otro. Cuando termina un torneo, el bot cierra sus
+						ventanas y abre las del siguiente, que esperan en el portal hasta que abra. Cada torneo de la cola usa las
+						cuentas de prueba <code>torneo1</code> … <code>torneoN</code> (N = número de jugadores) con la velocidad de
+						arriba; las desconexiones programadas solo aplican al primero. Su hora de inicio la pone el servidor: si el
+						anterior se alarga, el siguiente empieza sin los bots y ellos entran en cuanto el anterior termina.
+					</small>
+				</div>
+
+				<div class="field">
 					<span>Game Speed: <strong id="speedValue">2.0s</strong></span>
 					<div class="slider">
 						<small>0.5s</small>
@@ -71,6 +86,7 @@
 
 			<section>
 				<h2>STATUS</h2>
+				<p id="queueInfo" class="queue-info" hidden></p>
 				<table id="status"></table>
 				<p id="logFile" class="hint"></p>
 			</section>

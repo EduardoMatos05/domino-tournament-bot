@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { SPEED_JITTER } from "../src/config/defaults.js";
-import { validateRunConfig } from "../src/config/settings.js";
+import { testAccounts, validateRunConfig } from "../src/config/settings.js";
 import { parseTournamentUrl } from "../src/config/tournamentUrl.js";
 import { KIND, classify, portalBanner, roomGame, roomTournamentId } from "../src/game/classify.js";
 import { tileName } from "../src/game/selectors.js";
 import { moveDelayMs, shuffle } from "../src/game/timing.js";
 import { describeLoginFailure } from "../src/players/auth.js";
 import { DisconnectSchedule, TournamentWatch } from "../src/players/disconnects.js";
+import { STATUS } from "../src/players/PlayerBot.js";
+import { TournamentRunner } from "../src/runner/TournamentRunner.js";
 
 test("parseTournamentUrl toma el slug y apunta a login y portal", () => {
 	const t = parseTournamentUrl("https://plataforma.amigosxeldomino.com/mi-torneo/portal-comunicacion?x=1");
@@ -208,4 +210,63 @@ test("TournamentWatch: partidas sin repetir y quién sigue mirando el juego", ()
 	watch.look(1);
 	assert.equal(watch.othersWatching(0), true);
 	assert.equal(watch.othersWatching(0, Date.now() + 60_000), false, "hace mucho que no mira");
+});
+
+test("validateRunConfig arma la cola de torneos con las cuentas de prueba torneo1..N", () => {
+	const base = { tournamentUrl: "https://plataforma.x.com/primero/login", speed: 2, players: players("a", "b") };
+	assert.deepEqual(validateRunConfig(base).queue, []);
+	const { queue } = validateRunConfig({
+		...base,
+		queue: [
+			{ tournamentUrl: "https://plataforma.x.com/segundo/portal-comunicacion", playerCount: 3 },
+			{ tournamentUrl: "https://torneos.x.com/tercero", playerCount: "20" },
+		],
+	});
+	assert.deepEqual(
+		queue.map((q) => q.tournament.slug),
+		["segundo", "tercero"],
+	);
+	assert.equal(queue[1].tournament.origin, "https://plataforma.x.com");
+	assert.deepEqual(queue[0].accounts, testAccounts(3));
+	assert.deepEqual(queue[0].accounts[2], { username: "torneo3", password: "torneo3" });
+	assert.equal(queue[1].accounts.length, 20);
+	assert.throws(() => validateRunConfig({ ...base, queue: [{ tournamentUrl: "nada", playerCount: 2 }] }), /Torneo 2 de la cola/);
+	assert.throws(
+		() => validateRunConfig({ ...base, queue: [{ tournamentUrl: "https://plataforma.x.com/s", playerCount: 0 }] }),
+		/Torneo 2 de la cola: el número de jugadores/,
+	);
+	assert.throws(() => validateRunConfig({ ...base, queue: "x" }), /cola de torneos no es válida/);
+});
+
+test("cola: cuando un bot ve el final, los atorados se cierran tras el margen (solo si hay otro torneo)", async () => {
+	const runner = new TournamentRunner({ queueEndGraceMs: 30 });
+	const fakeBot = (status) => {
+		const bot = { name: status, status, stopped: false };
+		Object.defineProperty(bot, "isTerminal", { get: () => [STATUS.FINISHED, STATUS.CANCELLED, STATUS.ERROR, STATUS.STOPPED].includes(bot.status) });
+		bot.stop = async () => {
+			bot.stopped = true;
+			bot.status = STATUS.STOPPED;
+		};
+		return bot;
+	};
+	const tournament = { slug: "t", origin: "http://x" };
+	runner.abort = new AbortController();
+
+	// Sin más torneos en la cola no se cierra a nadie.
+	runner.plan = [{ tournament }];
+	runner.bots = [fakeBot(STATUS.FINISHED), fakeBot(STATUS.WAITING_MATCH)];
+	runner.noteTournamentEnd(runner.bots[0]);
+	assert.equal(runner.endTimer, null);
+
+	runner.plan = [{ tournament }, { tournament }];
+	const [done, stuck, errored] = (runner.bots = [fakeBot(STATUS.FINISHED), fakeBot(STATUS.WAITING_MATCH), fakeBot(STATUS.ERROR)]);
+	runner.noteTournamentEnd(stuck); // un bot que no terminó no arranca el margen
+	assert.equal(runner.endTimer, null);
+	runner.noteTournamentEnd(done);
+	assert.ok(runner.endTimer);
+	await new Promise((r) => setTimeout(r, 80));
+	assert.equal(stuck.stopped, true, "el atorado se cerró");
+	assert.equal(done.stopped, false);
+	assert.equal(errored.stopped, false);
+	clearTimeout(runner.endTimer);
 });
