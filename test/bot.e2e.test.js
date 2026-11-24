@@ -349,3 +349,17 @@ test("si el servidor ignora las jugadas: un solo aviso por ficha, aviso de racha
 		fake.close();
 	}
 });
+
+test("si ninguna ficha cabe dos turnos seguidos (mano vieja en pantalla), recarga la mesa y sigue jugando", { timeout: 90_000 }, async () => {
+	const fake = await startFakeTournament({ staleHand: true });
+	const { bot, lines } = makeBot(fake, "ok");
+	try {
+		await bot.run();
+		assert.equal(bot.status, STATUS.FINISHED, lines.join("\n"));
+		assert.equal(lines.filter((l) => l.includes("Reloading the table")).length, 1);
+		assert.equal(fake.moves.length, 3);
+	} finally {
+		await bot.stop();
+		fake.close();
+	}
+});

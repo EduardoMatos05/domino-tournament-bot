@@ -39,8 +39,8 @@ La máquina la pone GitHub; se usa desde cualquier navegador con una cuenta cola
 | Límite | Valor |
 |---|---|
 | Tiempo por corrida | 6 horas, contando la espera antes del torneo: iníciala unos 10 minutos antes |
-| Partidas por torneo | Hasta 40 a 0.5 s por jugada (unos 8 min por partida); más lento, menos partidas |
-| Jugadores | Hasta 20 recomendado |
+| Partidas por torneo | Hasta 40 a velocidad máxima (de 6 a 8 min por partida, 3 de ellos del descanso del servidor) |
+| Jugadores | Hasta 40 (probado con 40) |
 | Torneos a la vez | Uno; otra corrida espera a que termine la primera. No dejes más de una en espera: la anterior se cancela |
 
 **Desconexiones** (opcional): `3 1.2 1.3` = el bot 3 sale en el certamen 1, partida 2, y vuelve en la partida 3. Con

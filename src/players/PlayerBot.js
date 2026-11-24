@@ -114,6 +114,7 @@ export class PlayerBot {
 		this.tournamentId = null; // número del torneo de esta corrida (sale de la sesión del jugador)
 		this.lastBanner = null;
 		this.unconfirmed = 0; // jugadas seguidas que la pantalla aceptó y el servidor no
+		this.nonePlayable = 0; // turnos seguidos en que ninguna ficha de la pantalla cabía
 		this.loggedOutHits = 0;
 		this.warnedFace = false;
 		this.lastText = "";
@@ -345,6 +346,7 @@ export class PlayerBot {
 		});
 		if (result.played) {
 			this.unconfirmed = 0;
+			this.nonePlayable = 0;
 			// Tiempo real desde que el bot notó su turno hasta que la jugada salió hacia el servidor.
 			this.log.info(`Move sent ${((result.sentAt - turnStartedAt) / 1000).toFixed(1)}s after my turn started`);
 			return;
@@ -365,15 +367,23 @@ export class PlayerBot {
 			}
 			const reloadAt = snap.hand.length < FULL_HAND ? STALE_HAND_RELOAD.partial : STALE_HAND_RELOAD.full;
 			if (n % STALE_HAND_RELOAD.every === reloadAt) {
-				this.log.warn("Reloading the table: the screen may still show the previous hand");
-				await page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
-				return;
+				return this.reloadTable(page);
 			}
 			await sleep(UNCONFIRMED_BACKOFF_MS[Math.min(n, UNCONFIRMED_BACKOFF_MS.length) - 1], this.abort.signal);
 			return;
 		}
 
+		// Con una jugada posible el servidor da el turno; si ninguna ficha cabe, la mano en pantalla puede ser la anterior.
+		if (result.reason === "none-playable") {
+			this.nonePlayable += 1;
+			if (this.nonePlayable % STALE_HAND_RELOAD.every === STALE_HAND_RELOAD.partial) return this.reloadTable(page);
+		}
 		await sleep(1_000, this.abort.signal); // no martillar el click
+	}
+
+	async reloadTable(page) {
+		this.log.warn("Reloading the table: the screen may still show the previous hand");
+		await page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
 	}
 
 	/**
@@ -548,6 +558,7 @@ export class PlayerBot {
 		} else if (isRoom(state.kind) && !(was && isRoom(was))) {
 			this.log.info(`Match detected (${state.room})`);
 			this.unconfirmed = 0;
+			this.nonePlayable = 0;
 			this.lastBanner = null;
 			this.checkRoomTournament(state.room);
 		} else if (state.kind === KIND.OPPONENT_TURN) {

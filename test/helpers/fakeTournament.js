@@ -15,6 +15,7 @@ export function startFakeTournament({
 	tournamentId = 146,
 	roomTournamentId = tournamentId,
 	ignoreMoves = false, // el "servidor" recibe las jugadas pero nunca las aplica (como el caso de la cuenta en dos torneos)
+	staleHand = false, // la mesa rechaza todas las fichas hasta que se recarga (pantalla con la mano anterior)
 	games = null, // [{ event: "Certamen 1", game: 1 }, ...]
 	players = [], // con `games`: usuarios que juegan cada partida
 	countdownMs = 3_000, // espera antes de cada partida
@@ -59,6 +60,7 @@ export function startFakeTournament({
 				.replaceAll("@TID@", tournamentId)
 				.replaceAll("@RTID@", roomTournamentId)
 				.replaceAll("@IGNORE@", String(ignoreMoves))
+				.replaceAll("@STALE@", String(staleHand))
 				.replaceAll("@EVENT@", game.event)
 				.replaceAll("@GAME@", game.game);
 		if (url.pathname === `/${slug}/login`) return res.end(fill(LOGIN));
@@ -200,6 +202,7 @@ function click(tile) {
   if (!myTurn) return alert('No es su turno');
   const [a, b] = tile.split('-').map(Number);
   const hits = ends.filter((e) => e === a || e === b);
+  if (@STALE@ && performance.getEntriesByType('navigation')[0].type !== 'reload') return alert('La ficha no tiene cabida');
   if (!hits.length) return alert('La ficha no tiene cabida');
   if (ends[0] !== ends[1] && ((a === ends[0] && b === ends[1]) || (b === ends[0] && a === ends[1]))) {
     $('modals').innerHTML = '<div id="modalGame"><button><span>Cerrar modal</span></button><div class="flex flex-col gap-3">' +
