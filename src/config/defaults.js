@@ -4,7 +4,7 @@ export const MIN_PLAYERS = 1;
 export const DEFAULT_PLAYER_COUNT = 8;
 export const isValidPlayerCount = (n) => Number.isInteger(n) && n >= MIN_PLAYERS;
 
-export const SPEED = { min: 0.5, max: 4.0, step: 0.1, default: 2.0 };
+export const SPEED = { min: 0.1, max: 4.0, step: 0.1, default: 2.0 };
 // Variación aleatoria (±) aplicada a la espera antes de cada jugada.
 export const SPEED_JITTER = 0.2;
 
@@ -15,17 +15,24 @@ export const ROOM_POLL_MS = 150; // dentro de una mesa se mira más seguido para
 export const LOGIN_TIMEOUT_MS = 30_000;
 export const PREPARE_MS = 150; // margen para releer la mano antes de que se cumpla la espera
 export const MOVE_SETTLE_MS = 250; // espera tras el click para ver si salió un alert o el modal de lado
-export const MOVE_CONFIRM_TIMEOUT_MS = 4_000; // espera a que la ficha salga de la mano
+export const MOVE_CONFIRM_TIMEOUT_MS = 2_500; // espera a que la ficha salga de la mano
 export const TERMINAL_CONFIRMATIONS = 3; // sondeos seguidos para dar por cierto fin/cancelación del torneo
 
 // El juego cierra la sesión tras 10 min sin eventos de puntero/teclado.
 export const KEEPALIVE_MS = 4 * 60_000;
 // El JWT dura 1 h y solo se renueva al recargar la página.
 export const PORTAL_RELOAD_MS = 40 * 60_000;
+// Si otro bot ya entró a la mesa de una partida y este sigue en el portal, se perdió el aviso: recarga el portal (una vez).
+export const MISSED_GAME_MS = 8_000;
 export const LOBBY_CLOSED_RELOAD_MS = 60_000; // el portal no se actualiza solo cuando aún no abre
 
 // Si el servidor no acepta una jugada que la pantalla sí aceptó, se espera cada vez más antes de reintentar.
-export const UNCONFIRMED_BACKOFF_MS = [1_000, 2_000, 3_000, 5_000];
+export const UNCONFIRMED_BACKOFF_MS = [300, 1_000, 3_000, 5_000];
+// A veces una mano nueva empieza y la pantalla se queda con las fichas de la anterior: recargar la mesa lo arregla.
+// Se recarga a las `partial` jugadas seguidas sin aceptar; con la mano completa, a las `full` (al abrir la partida el
+// servidor suele ignorar la primera) y luego cada `every`.
+export const STALE_HAND_RELOAD = { partial: 2, full: 4, every: 5 };
+export const FULL_HAND = 7;
 // Si pasa este tiempo sin ninguna línea de log de un jugador, se escribe una línea de "sigue vivo".
 export const HEARTBEAT_LOG_MS = 120_000;
 

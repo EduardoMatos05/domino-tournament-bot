@@ -10,11 +10,18 @@ on:
       jugadores:
         description: "Número de jugadores (cuentas torneo1, torneo2, ... ya inscritas)"
         required: true
-        default: "8"
+        default: "40"
       velocidad:
-        description: "Segundos por jugada (0.5 a 4)"
+        description: "Segundos que tarda cada jugador en tirar"
         required: true
-        default: "0.5"
+        type: choice
+        default: "0.1 (máxima)"
+        options:
+          - "0.1 (máxima)"
+          - "0.5"
+          - "1"
+          - "2 (normal)"
+          - "4 (lenta)"
       desconexiones:
         description: "Opcional. Ej.: 3 1.2 1.3 = el bot 3 sale en certamen 1 partida 2 y vuelve en la 3"
         required: false

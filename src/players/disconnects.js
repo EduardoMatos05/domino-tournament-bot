@@ -57,6 +57,7 @@ export class TournamentWatch {
 	constructor() {
 		this.games = []; // partidas en el orden en que aparecieron en alguna mesa
 		this.seen = new Set();
+		this.gameAt = 0; // cuándo se vio por primera vez la última partida
 		this.waitingAt = 0; // última vez que algún portal pasó a la espera de la siguiente partida, o que el torneo terminó
 		this.lastLook = new Map(); // jugador -> última vez que miró el juego
 	}
@@ -72,6 +73,14 @@ export class TournamentWatch {
 		if (this.seen.has(key)) return;
 		this.seen.add(key);
 		this.games.push(game);
+		this.gameAt = Date.now();
+	}
+
+	/** ¿Otro bot ya está en la mesa de una partida que este jugador (`mine` = su última partida) todavía no ve? */
+	missedGame(mine, waitMs, now = Date.now()) {
+		const last = this.games.at(-1);
+		if (!last || now - this.gameAt < waitMs) return false;
+		return !mine || mine.name !== last.name || mine.game !== last.game;
 	}
 
 	/** El torneo pasó a la espera de la siguiente partida, o terminó: los bots desconectados pueden volver. */

@@ -1,7 +1,7 @@
 // Juega sin interfaz ni ventanas, con los datos en variables de entorno (lo usa GitHub Actions):
 //   BOT_URL            URL del torneo
 //   BOT_JUGADORES      cuántas cuentas de prueba (torneo1..torneoN)
-//   BOT_VELOCIDAD      segundos por jugada
+//   BOT_VELOCIDAD      segundos por jugada; se usa el número del principio ("0.1 (máxima)" = 0.1)
 //   BOT_DESCONEXIONES  opcional: "3 1.2 1.3; 5 1.4 1.6 confirmar" = el bot 3 sale en el certamen 1 partida 2 y
 //                      vuelve en la 3; el bot 5 confirma, sale en la 4 y vuelve en la 6
 // Termina con código 0 solo si todos los jugadores vieron el final del torneo.
@@ -35,7 +35,7 @@ async function main(env) {
 	if (!Number.isInteger(count) || count < 1) throw new Error("El número de jugadores debe ser un entero de 1 o más.");
 	const config = validateRunConfig({
 		tournamentUrl: env.BOT_URL,
-		speed: env.BOT_VELOCIDAD || SPEED.default,
+		speed: env.BOT_VELOCIDAD ? Number.parseFloat(env.BOT_VELOCIDAD) : SPEED.default,
 		players: testAccounts(count),
 		disconnects: parseDisconnectText(env.BOT_DESCONEXIONES),
 	});

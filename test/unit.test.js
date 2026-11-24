@@ -281,3 +281,15 @@ test("parseDisconnectText lee las desconexiones en texto (GitHub Actions)", () =
 	]);
 	assert.throws(() => parseDisconnectText("3 1-2 1-3"), /no válida/);
 });
+
+test("TournamentWatch.missedGame: otro bot ya está en una partida que este no vio", () => {
+	const watch = new TournamentWatch();
+	assert.equal(watch.missedGame(null, 8_000), false, "todavía no hay partidas");
+	const game = { name: "Concurso 1", game: 1 };
+	watch.sawGame(game);
+	assert.equal(watch.missedGame(null, 8_000), false, "se espera un poco antes de darla por perdida");
+	assert.equal(watch.missedGame(null, 8_000, Date.now() + 9_000), true);
+	assert.equal(watch.missedGame({ ...game }, 8_000, Date.now() + 9_000), false, "ya la jugó");
+	watch.sawGame({ name: "Concurso 1", game: 2 });
+	assert.equal(watch.missedGame({ ...game }, 8_000, Date.now() + 9_000), true);
+});

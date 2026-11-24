@@ -1,17 +1,20 @@
 import {
 	ALONE_RECONNECT_MS,
 	CONFIRM_THEN_LEAVE_MS,
+	FULL_HAND,
 	GAME_INFO_WAIT_MS,
 	HEARTBEAT_LOG_MS,
 	KEEPALIVE_MS,
 	LOBBY_CLOSED_RELOAD_MS,
 	MAX_CONSECUTIVE_ERRORS,
 	MAX_RELOGINS,
+	MISSED_GAME_MS,
 	MOVE_CONFIRM_TIMEOUT_MS,
 	POLL_MS,
 	PORTAL_RELOAD_MS,
 	PREPARE_MS,
 	ROOM_POLL_MS,
+	STALE_HAND_RELOAD,
 	TERMINAL_CONFIRMATIONS,
 	UNCONFIRMED_BACKOFF_MS,
 } from "../config/defaults.js";
@@ -118,6 +121,7 @@ export class PlayerBot {
 
 		this.schedule = new DisconnectSchedule(disconnects);
 		this.watch = watch ?? new TournamentWatch();
+		this.resyncedAt = 0; // partida (watch.gameAt) por la que ya se recargó el portal
 		this.gamesSeen = 0; // cuántas partidas de watch.games ya se revisaron contra las desconexiones
 		this.room = null; // mesa actual y su partida (cuando la mesa la muestra)
 		this.roomSince = 0;
@@ -262,6 +266,11 @@ export class PlayerBot {
 				const [rule] = this.syncGames();
 				if (rule) return this.goOffline(rule, `Scheduled disconnect at ${pointLabel(rule.off)}`);
 				this.setStatus(STATUS.WAITING_MATCH);
+				if (this.resyncedAt !== this.watch.gameAt && this.watch.missedGame(this.game, MISSED_GAME_MS)) {
+					this.resyncedAt = this.watch.gameAt;
+					this.log.warn("Other bots are already at their tables: reloading the portal in case the call was missed");
+					return this.reloadPortalIf(0);
+				}
 				return this.reloadPortalIf(PORTAL_RELOAD_MS);
 			}
 
@@ -353,6 +362,12 @@ export class PlayerBot {
 					`${n} moves in a row were not accepted: the screen takes the tile but the server ignores it. ` +
 						"Check the engine (tour) logs; an account enrolled in two active tournaments can cause this.",
 				);
+			}
+			const reloadAt = snap.hand.length < FULL_HAND ? STALE_HAND_RELOAD.partial : STALE_HAND_RELOAD.full;
+			if (n % STALE_HAND_RELOAD.every === reloadAt) {
+				this.log.warn("Reloading the table: the screen may still show the previous hand");
+				await page.reload({ waitUntil: "domcontentloaded", timeout: 30_000 });
+				return;
 			}
 			await sleep(UNCONFIRMED_BACKOFF_MS[Math.min(n, UNCONFIRMED_BACKOFF_MS.length) - 1], this.abort.signal);
 			return;
