@@ -25,6 +25,29 @@ npm start     # abre http://127.0.0.1:4173
 4. Pulsa **START TOURNAMENT**. No cierres ni minimices las ventanas. **STOP** cierra todo; al terminar el torneo
    las ventanas quedan abiertas hasta **CLOSE BROWSERS**.
 
+## Jugar desde GitHub (sin instalar nada)
+
+La máquina la pone GitHub; se usa desde cualquier navegador con una cuenta colaboradora del repositorio.
+
+1. Abre [Jugar torneo](https://github.com/EduardoMatos05/domino-tournament-bot/actions/workflows/jugar-torneo.yml) y
+   pulsa **Run workflow**.
+2. Llena la URL del torneo, los jugadores (cuentas `torneo1` … `torneoN`, ya inscritas) y la velocidad.
+3. Pulsa el botón verde **Run workflow**. En unos segundos aparece la corrida: ábrela y entra a **Jugar** para ver el
+   avance. Ya puedes cerrar la página o apagar tu computadora; el bot sigue.
+4. Para detenerlo: **Cancel workflow**. Al final quedan el resultado de cada jugador y el log para descargar.
+
+| Límite | Valor |
+|---|---|
+| Tiempo por corrida | 6 horas, contando la espera antes del torneo: iníciala unos 10 minutos antes |
+| Partidas por torneo | Hasta 40 a 0.5 s por jugada (unos 8 min por partida); más lento, menos partidas |
+| Jugadores | Hasta 20 recomendado |
+| Torneos a la vez | Uno; otra corrida espera a que termine la primera. No dejes más de una en espera: la anterior se cancela |
+
+**Desconexiones** (opcional): `3 1.2 1.3` = el bot 3 sale en el certamen 1, partida 2, y vuelve en la partida 3. Con
+`confirmar` al final, confirma asistencia antes de salir. Varias se separan con `;`.
+
+El repositorio es público: la URL del torneo y los usuarios se ven en los logs. Usa solo cuentas de prueba.
+
 ## Cola de torneos (Next tournaments)
 
 Con **+** agregas otro torneo que se juega cuando termina el de arriba: su URL y cuántos jugadores. Puedes agregar

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { parseDisconnectText } from "../src/cli.js";
 import { SPEED_JITTER } from "../src/config/defaults.js";
 import { testAccounts, validateRunConfig } from "../src/config/settings.js";
 import { parseTournamentUrl } from "../src/config/tournamentUrl.js";
@@ -269,4 +270,14 @@ test("cola: cuando un bot ve el final, los atorados se cierran tras el margen (s
 	assert.equal(done.stopped, false);
 	assert.equal(errored.stopped, false);
 	clearTimeout(runner.endTimer);
+});
+
+test("parseDisconnectText lee las desconexiones en texto (GitHub Actions)", () => {
+	assert.deepEqual(parseDisconnectText(""), []);
+	assert.deepEqual(parseDisconnectText(undefined), []);
+	assert.deepEqual(parseDisconnectText("3 1.2 1.3; 5 1.4 2.1 confirmar"), [
+		{ player: 2, off: { event: 1, game: 2 }, on: { event: 1, game: 3 }, confirm: false },
+		{ player: 4, off: { event: 1, game: 4 }, on: { event: 2, game: 1 }, confirm: true },
+	]);
+	assert.throws(() => parseDisconnectText("3 1-2 1-3"), /no válida/);
 });
